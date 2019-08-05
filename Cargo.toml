@@ -1,0 +1,15 @@
+[package]
+name = "atsdump"
+version = "0.1.0"
+authors = ["Alex Norman <alex@x37v.info>"]
+edition = "2018"
+
+[lib]
+name = "atsdump"
+crate-type = ["cdylib"]
+
+[dependencies]
+ats-sys = { path = "../ats-sys/" }
+pd-sys = { git = "https://github.com/x37v/puredata-rust", branch = "develop" }
+pd-ext = { git = "https://github.com/x37v/puredata-rust", branch = "develop" }
+pd-ext-macros = { git = "https://github.com/x37v/puredata-rust", branch = "develop" }
