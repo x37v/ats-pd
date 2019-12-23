@@ -10,6 +10,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ats-sys = { path = "../ats-sys/" }
-pd-sys = { git = "https://github.com/x37v/puredata-rust", branch = "develop" }
-pd-ext = { git = "https://github.com/x37v/puredata-rust", branch = "develop" }
-pd-ext-macros = { git = "https://github.com/x37v/puredata-rust", branch = "develop" }
+pd-sys = "0.1.0"
+pd-ext = { path = "../../puredata/external/" } #git = "https://github.com/x37v/puredata-rust", branch = "develop" 
+pd-ext-macros = { path = "../../puredata/macros/" } #git = "https://github.com/x37v/puredata-rust", branch = "develop"
