@@ -18,13 +18,14 @@ struct AtsFile {
 external! {
 
     pub struct AtsDump {
+        current: Option<f32>,
         outlet: Rc<dyn OutletSend>,
     }
 
     impl ControlExternal for AtsDump {
         fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
             let outlet = builder.new_message_outlet(OutletType::AnyThing);
-            Self { outlet }
+            Self { outlet, current: None }
         }
     }
 
@@ -47,7 +48,7 @@ external! {
         }
 
         fn read_file(&mut self, filename: &Symbol) -> std::io::Result<()> {
-            let mut file = File::open(filename.as_ref())?;
+            let mut file = File::open(filename)?;
             let mut header: std::mem::MaybeUninit<ATS_HEADER> = std::mem::MaybeUninit::uninit();
             unsafe {
                 let s = slice::from_raw_parts_mut(&mut header as *mut _ as *mut u8, std::mem::size_of::<ATS_HEADER>());

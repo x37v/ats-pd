@@ -1,4 +1,6 @@
 /target
+/atsdump
+.gdb_history
 **/*.rs.bk
 *.pd_*
 Cargo.lock
