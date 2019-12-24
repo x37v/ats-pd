@@ -6,11 +6,22 @@ use pd_ext::outlet::{OutletSend, OutletType};
 use pd_ext::pd;
 use pd_ext::symbol::Symbol;
 use pd_ext_macros::external;
+use std::convert::TryInto;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::rc::Rc;
 use std::slice;
+
+lazy_static::lazy_static! {
+    static ref SAMPLE_RATE: Symbol = "sample_rate".try_into().unwrap();
+    static ref FRAME_SIZE: Symbol = "frame_size".try_into().unwrap();
+    static ref WINDOW_SIZE: Symbol = "window_size".try_into().unwrap();
+    static ref PARTIAL_COUNT: Symbol = "partial_count".try_into().unwrap();
+    static ref FRAME_COUNT: Symbol = "frame_count".try_into().unwrap();
+    static ref AMP_MAX: Symbol = "amp_max".try_into().unwrap();
+    static ref FREQ_MAX: Symbol = "freq_max".try_into().unwrap();
+    static ref DUR_SECONDS: Symbol = "dur_sec".try_into().unwrap();
+}
 
 const NOISE_BANDS: usize = 25;
 
@@ -131,7 +142,18 @@ external! {
 
         #[bang] //indicates that a bang in Pd should call this
         pub fn bang(&mut self) {
-            //pd::post(CString::new("Hello world !!").unwrap());
+            if let Some(f) = &self.current {
+                self.outlet.send_anything(*SAMPLE_RATE, &[(f.header.sr as pd_sys::t_float).into()]);
+                self.outlet.send_anything(*FRAME_SIZE, &[(f.header.fs as pd_sys::t_float).into()]);
+                self.outlet.send_anything(*WINDOW_SIZE, &[(f.header.ws as pd_sys::t_float).into()]);
+                self.outlet.send_anything(*PARTIAL_COUNT, &[(f.header.par as pd_sys::t_float).into()]);
+                self.outlet.send_anything(*FRAME_COUNT, &[(f.header.fra as pd_sys::t_float).into()]);
+                self.outlet.send_anything(*AMP_MAX, &[(f.header.ma as pd_sys::t_float).into()]);
+                self.outlet.send_anything(*FREQ_MAX, &[(f.header.mf as pd_sys::t_float).into()]);
+                self.outlet.send_anything(*DUR_SECONDS, &[(f.header.dur as pd_sys::t_float).into()]);
+            } else {
+                //XXX
+            }
         }
 
         #[sel]
@@ -146,6 +168,7 @@ external! {
                     None
                 }
             };
+            self.bang();
         }
     }
 }
