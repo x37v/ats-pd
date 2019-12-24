@@ -8,6 +8,8 @@
 #X msg 112 127 open \$1;
 #X obj 119 75 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
 -1;
+#X obj 85 208 print atsinfo;
+#X connect 1 0 6 0;
 #X connect 2 0 1 0;
 #X connect 3 0 4 0;
 #X connect 4 0 1 0;
