@@ -21,6 +21,7 @@ lazy_static::lazy_static! {
     static ref AMP_MAX: Symbol = "amp_max".try_into().unwrap();
     static ref FREQ_MAX: Symbol = "freq_max".try_into().unwrap();
     static ref DUR_SECONDS: Symbol = "dur_sec".try_into().unwrap();
+    static ref FILE_TYPE: Symbol = "file_type".try_into().unwrap();
 }
 
 const NOISE_BANDS: usize = 25;
@@ -151,6 +152,7 @@ external! {
                 self.outlet.send_anything(*AMP_MAX, &[(f.header.ma as pd_sys::t_float).into()]);
                 self.outlet.send_anything(*FREQ_MAX, &[(f.header.mf as pd_sys::t_float).into()]);
                 self.outlet.send_anything(*DUR_SECONDS, &[(f.header.dur as pd_sys::t_float).into()]);
+                self.outlet.send_anything(*FILE_TYPE, &[(f.header.typ as pd_sys::t_float).into()]);
             } else {
                 //XXX
             }
