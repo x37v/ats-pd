@@ -38,7 +38,7 @@ enum AtsFileType {
 
 struct AtsFile {
     pub header: ATS_HEADER,
-    pub peaks: Vec<Vec<Peak>>,
+    pub frames: Vec<Vec<Peak>>,
     pub noise: Option<Vec<[f64; NOISE_BANDS]>>,
     pub file_type: AtsFileType,
 }
@@ -74,7 +74,7 @@ impl AtsFile {
                 }
             };
 
-            let mut peaks = Vec::new();
+            let mut frames = Vec::new();
             let mut noise = Vec::new();
             for _f in 0..header.fra as usize {
                 //skip frame time
@@ -106,13 +106,13 @@ impl AtsFile {
                     }
                     _ => (),
                 }
-                peaks.push(frame_peaks);
+                frames.push(frame_peaks);
             }
 
             let noise = if noise.len() != 0 { Some(noise) } else { None };
             Ok(Self {
                 header,
-                peaks,
+                frames,
                 noise,
                 file_type,
             })
@@ -156,7 +156,7 @@ external! {
         fn send_tracks(&self, f: &AtsFile) {
             //data is in frames, each frame has the same number of tracks
             //we output track index, frame index, freq, amp
-            for (i, frame) in f.peaks.iter().enumerate() {
+            for (i, frame) in f.frames.iter().enumerate() {
                 for (j, track) in frame.iter().enumerate() {
                     self.plot_details_outlet.send_anything(*PLOT_TRACK, &[j.into(), i.into(), track.freq.into(), track.amp.into()]);
                 }
