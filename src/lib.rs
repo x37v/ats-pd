@@ -23,7 +23,7 @@ lazy_static::lazy_static! {
     static ref DUR_SECONDS: Symbol = "dur_sec".try_into().unwrap();
     static ref FILE_TYPE: Symbol = "file_type".try_into().unwrap();
 
-    static ref PLOT_INFO_TRACKS: Symbol = "tracks".try_into().unwrap();
+    static ref PLOT_INFO_TRACKS: Symbol = "track_count".try_into().unwrap();
     static ref PLOT_TRACK: Symbol = "track_point".try_into().unwrap();
 }
 
@@ -129,20 +129,14 @@ struct Peak {
 external! {
     pub struct AtsDump {
         current: Option<AtsFile>,
-        plot_details_outlet: Box<dyn OutletSend>,
-        plot_info_outlet: Box<dyn OutletSend>,
-        file_info_outlet: Box<dyn OutletSend>,
+        outlet: Box<dyn OutletSend>,
     }
 
     impl ControlExternal for AtsDump {
         fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
-            let plot_details_outlet = builder.new_message_outlet(OutletType::AnyThing);
-            let plot_info_outlet = builder.new_message_outlet(OutletType::AnyThing);
-            let file_info_outlet = builder.new_message_outlet(OutletType::AnyThing);
+            let outlet = builder.new_message_outlet(OutletType::AnyThing);
             Self {
-                plot_details_outlet,
-                plot_info_outlet,
-                file_info_outlet,
+                outlet,
                 current: None
             }
         }
@@ -158,35 +152,42 @@ external! {
             //we output track index, frame index, freq, amp
             for (i, frame) in f.frames.iter().enumerate() {
                 for (j, track) in frame.iter().enumerate() {
-                    self.plot_details_outlet.send_anything(*PLOT_TRACK, &[j.into(), i.into(), track.freq.into(), track.amp.into()]);
+                    self.outlet.send_anything(*PLOT_TRACK, &[j.into(), i.into(), track.freq.into(), track.amp.into()]);
                 }
             }
+        }
+
+        fn send_file_info(&self, f: &AtsFile) {
+            self.outlet.send_anything(*FILE_TYPE, &[f.header.typ.into()]);
+            self.outlet.send_anything(*SAMPLE_RATE, &[f.header.sr.into()]);
+            self.outlet.send_anything(*DUR_SECONDS, &[f.header.dur.into()]);
+            self.outlet.send_anything(*FRAME_SIZE, &[f.header.fs.into()]);
+            self.outlet.send_anything(*WINDOW_SIZE, &[f.header.ws.into()]);
+            self.outlet.send_anything(*PARTIAL_COUNT, &[f.header.par.into()]);
+            self.outlet.send_anything(*FRAME_COUNT, &[f.header.fra.into()]);
+            self.outlet.send_anything(*AMP_MAX, &[f.header.ma.into()]);
+            self.outlet.send_anything(*FREQ_MAX, &[f.header.mf.into()]);
         }
 
         #[bang] //indicates that a bang in Pd should call this
         pub fn bang(&mut self) {
             if let Some(f) = &self.current {
-                self.file_info_outlet.send_anything(*SAMPLE_RATE, &[f.header.sr .into()]);
-                self.file_info_outlet.send_anything(*FRAME_SIZE, &[f.header.fs .into()]);
-                self.file_info_outlet.send_anything(*WINDOW_SIZE, &[f.header.ws .into()]);
-                self.file_info_outlet.send_anything(*PARTIAL_COUNT, &[f.header.par .into()]);
-                self.file_info_outlet.send_anything(*FRAME_COUNT, &[f.header.fra .into()]);
-                self.file_info_outlet.send_anything(*AMP_MAX, &[f.header.ma .into()]);
-                self.file_info_outlet.send_anything(*FREQ_MAX, &[f.header.mf .into()]);
-                self.file_info_outlet.send_anything(*DUR_SECONDS, &[f.header.dur .into()]);
-                self.file_info_outlet.send_anything(*FILE_TYPE, &[f.header.typ .into()]);
+                self.send_file_info(f);
             } else {
-                //XXX
+                //XXX indicate fail
+                self.outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
             }
         }
 
         #[sel]
         pub fn plot(&mut self) {
             if let Some(f) = &self.current {
-                self.plot_info_outlet.send_anything(*PLOT_INFO_TRACKS, &[f.header.par.into(), f.header.fra.into()]);
+                self.send_file_info(f);
+                self.outlet.send_anything(*PLOT_INFO_TRACKS, &[f.header.par.into(), f.header.fra.into()]);
                 self.send_tracks(f);
             } else {
-                self.plot_info_outlet.send_anything(*PLOT_INFO_TRACKS, &[0f32.into(), 0f32.into()]);
+                self.outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
+                self.outlet.send_anything(*PLOT_INFO_TRACKS, &[0f32.into(), 0f32.into()]);
             }
         }
 
