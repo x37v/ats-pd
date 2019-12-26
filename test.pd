@@ -3,7 +3,7 @@ float y;
 #N struct ats-trace-template float x float y array points ats-point-template
 ;
 #N struct ats-point-template float freq float amp float y;
-#N canvas 2 74 1916 1004 10;
+#N canvas 2 74 895 968 10;
 #X declare -path .;
 #X obj 186 18 declare -path .;
 #X obj 24 103 atsdump;
@@ -25,7 +25,7 @@ float y;
 ;
 #X obj 6 58 plot curve points 0 1 0 0 5;
 #X restore 549 38 pd ats-trace-template;
-#N canvas 2 74 1465 808 ats-trace-list 0;
+#N canvas 2 74 1030 561 ats-trace-list 0;
 #X scalar ats-data-template 10 10 \; 0 0 \; 263.378 0 32.9222 \; 263.378
 0 32.9222 \; 263.378 0 32.9222 \; 263.378 0 32.9222 \; 263.378 0 32.9222
 \; 263.378 0 32.9222 \; 263.378 0 32.9222 \; 263.378 0 32.9222 \; 263.378
