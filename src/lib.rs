@@ -14,8 +14,8 @@ use std::slice;
 
 lazy_static::lazy_static! {
     static ref SAMPLE_RATE: Symbol = "sample_rate".try_into().unwrap();
-    static ref FRAME_SIZE: Symbol = "frame_size".try_into().unwrap();
-    static ref WINDOW_SIZE: Symbol = "window_size".try_into().unwrap();
+    static ref FRAME_SIZE: Symbol = "frame_samps".try_into().unwrap();
+    static ref WINDOW_SIZE: Symbol = "window_samps".try_into().unwrap();
     static ref PARTIAL_COUNT: Symbol = "partial_count".try_into().unwrap();
     static ref FRAME_COUNT: Symbol = "frame_count".try_into().unwrap();
     static ref AMP_MAX: Symbol = "amp_max".try_into().unwrap();
