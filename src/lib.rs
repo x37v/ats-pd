@@ -169,18 +169,8 @@ external! {
             self.outlet.send_anything(*FREQ_MAX, &[f.header.mf.into()]);
         }
 
-        #[bang] //indicates that a bang in Pd should call this
+        #[bang]
         pub fn bang(&mut self) {
-            if let Some(f) = &self.current {
-                self.send_file_info(f);
-            } else {
-                //XXX indicate fail
-                self.outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
-            }
-        }
-
-        #[sel]
-        pub fn plot(&mut self) {
             if let Some(f) = &self.current {
                 self.send_file_info(f);
                 self.outlet.send_anything(*PLOT_INFO_TRACKS, &[f.header.par.into(), f.header.fra.into()]);
