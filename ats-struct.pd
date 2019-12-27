@@ -1,4 +1,4 @@
-#N canvas 431 82 1405 970 12;
+#N canvas 506 108 1405 970 12;
 #X obj 160 595 setsize ats-track-template points;
 #X obj 139 806 element ats-track-template points;
 #X msg 139 722 \$2;
@@ -41,12 +41,21 @@
 ;
 #X obj 6 58 plot curve points 0 1 0 0 5;
 #X restore 1204 786 pd ats-track-template;
-#N canvas 2482 153 467 125 ats-data-template 0;
+#N canvas 598 214 450 345 ats-data-template 0;
 #X obj 3 81 plot tracks;
 #X obj 2 12 struct ats-data-template array tracks ats-track-template
 float x float y float file_type float sample_rate float track_count
 float frame_count float dur_sec float amp_max float freq_max float
 frame_samps float window_samps;
+#X obj 4 105 drawnumber file_type 0 0 0 file_type=;
+#X obj 4 127 drawnumber sample_rate 0 15 0 sample_rate=;
+#X obj 4 173 drawnumber frame_count 0 45 0 frame_count=;
+#X obj 4 150 drawnumber track_count 0 30 0 track_count=;
+#X obj 4 195 drawnumber frame_samps 0 60 0 frame_samps=;
+#X obj 4 218 drawnumber window_samps 0 75 0 window_samps=;
+#X obj 5 241 drawnumber freq_max 0 90 0 freq_max=;
+#X obj 5 264 drawnumber amp_max 0 105 0 amp_max=;
+#X obj 5 287 drawnumber dur_sec 0 120 0 dur_sec=;
 #X restore 1205 810 pd ats-data-template;
 #X obj 603 847 pointer;
 #X obj 603 795 r \$0-sendp;

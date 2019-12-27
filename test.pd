@@ -24,7 +24,7 @@ window_samps;
 #X msg 60 443 all pos \$1;
 #X msg 111 474 all pointer \$1;
 #X msg 180 174 \; pd-ats-data clear;
-#N canvas 506 517 1030 561 ats-data 0;
+#N canvas 2500 196 1030 561 ats-data 1;
 #X scalar ats-data-template 10 10 4 44100 20 2252 2.24399 0.0862295
 19913.5 44 353 \; 0 0 \; 1089.74 0 136.218 \; 1089.74 0 136.218 \;
 1089.74 0 136.218 \; 1089.74 0 136.218 \; 1089.74 0 136.218 \; 1089.74
