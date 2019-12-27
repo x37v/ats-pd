@@ -1,6 +1,6 @@
-#N canvas 2 213 1058 865 12;
-#X obj 219 549 setsize ats-trace-template points;
-#X obj 139 753 element ats-trace-template points;
+#N canvas 860 74 1058 865 12;
+#X obj 219 549 setsize ats-track-template points;
+#X obj 139 753 element ats-track-template points;
 #X msg 139 669 \$2;
 #X obj 11 827 set ats-point-template y freq amp;
 #X obj 14 649 unpack f f f f;
@@ -35,17 +35,19 @@
 #X obj 10 18 struct ats-point-template float freq float amp float y
 ;
 #X restore 805 9 pd ats-point-template;
-#N canvas 2 74 484 191 ats-trace-template 0;
-#X obj 5 7 struct ats-trace-template float x float y array points ats-point-template
+#N canvas 2 74 484 191 ats-track-template 0;
+#X obj 5 7 struct ats-track-template float x float y array points ats-point-template
 ;
 #X text 181 60 plot args: rgbcolor \, linewith \, x \, y \, spacing
 ;
 #X obj 6 58 plot curve points 0 1 0 0 5;
-#X restore 805 31 pd ats-trace-template;
-#N canvas 2 74 402 106 ats-data-template 0;
-#X obj 2 12 struct ats-data-template array tracks ats-trace-template
-float x float y;
-#X obj 51 49 plot tracks;
+#X restore 805 31 pd ats-track-template;
+#N canvas 491 736 573 120 ats-data-template 1;
+#X obj 3 81 plot tracks;
+#X obj 2 12 struct ats-data-template array tracks ats-track-template
+float x float y float type float sample_rate float track_count float
+frame_count float dur_sec float amp_max float freq_max float frame_samps
+float window_samps;
 #X restore 806 55 pd ats-data-template;
 #X obj 629 620 pointer;
 #X obj 629 589 r \$0-sendp;

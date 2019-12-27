@@ -38,9 +38,9 @@
 #X obj 10 785 +;
 #X floatatom 176 316 5 0 0 0 - - -;
 #X obj 438 216 > \$1;
-#X obj 102 417 element ats-trace-template points;
-#X obj 147 443 element ats-trace-template points;
-#X obj 407 413 getsize ats-trace-template points;
+#X obj 102 417 element ats-track-template points;
+#X obj 147 443 element ats-track-template points;
+#X obj 407 413 getsize ats-track-template points;
 #X obj 70 42 route pos pointer;
 #X connect 1 0 38 0;
 #X connect 2 0 8 0;
