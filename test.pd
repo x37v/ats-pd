@@ -9,22 +9,21 @@ window_samps;
 #X declare -path .;
 #X obj 429 40 declare -path .;
 #X obj 111 236 atsdump;
-#X obj 49 100 openpanel;
-#X msg 49 123 open \$1;
-#X obj 49 77 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
+#X obj 111 77 openpanel;
+#X msg 111 100 open \$1;
+#X obj 111 54 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
 -1;
-#X msg 111 77 plot;
 #X obj 168 235 pointer;
-#X obj 111 100 t a b b;
+#X obj 111 134 t a b b;
 #X obj 111 259 ats-struct;
 #X obj 61 623 dac~;
 #X obj 63 414 hsl 500 15 0 100 0 0 empty empty empty -2 -8 0 10 -262144
--1 -1 18500 1;
+-1 -1 0 1;
 #X obj 60 517 clone ats-sin 40;
 #X msg 60 443 all pos \$1;
 #X msg 111 474 all pointer \$1;
 #X msg 180 174 \; pd-ats-data clear;
-#N canvas 2 517 1030 561 ats-data 0;
+#N canvas 488 264 1030 561 ats-data 0;
 #X scalar ats-data-template 10 10 4 44100 42 253 2.51134 0.195128 19762.5
 441 1765 \; 0 0 \; 263.378 0 32.9222 \; 263.378 0 32.9222 \; 263.378
 0 32.9222 \; 263.378 0 32.9222 \; 263.378 0 32.9222 \; 263.378 0 32.9222
@@ -3920,20 +3919,19 @@ window_samps;
 #X restore 430 15 pd ats-data;
 #X msg 168 210 traverse pd-ats-data \, bang;
 #X msg 15 386 vis 1 1;
-#X connect 1 0 8 0;
+#X connect 1 0 7 0;
 #X connect 2 0 3 0;
-#X connect 3 0 1 0;
+#X connect 3 0 6 0;
 #X connect 4 0 2 0;
-#X connect 5 0 7 0;
-#X connect 6 0 8 1;
-#X connect 7 0 1 0;
-#X connect 7 1 16 0;
-#X connect 7 2 14 0;
-#X connect 8 0 13 0;
-#X connect 10 0 12 0;
-#X connect 11 0 9 0;
-#X connect 11 0 9 1;
-#X connect 12 0 11 0;
-#X connect 13 0 11 0;
-#X connect 16 0 6 0;
-#X connect 17 0 11 0;
+#X connect 5 0 7 1;
+#X connect 6 0 1 0;
+#X connect 6 1 15 0;
+#X connect 6 2 13 0;
+#X connect 7 0 12 0;
+#X connect 9 0 11 0;
+#X connect 10 0 8 0;
+#X connect 10 0 8 1;
+#X connect 11 0 10 0;
+#X connect 12 0 10 0;
+#X connect 15 0 5 0;
+#X connect 16 0 10 0;
