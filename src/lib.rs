@@ -25,6 +25,8 @@ lazy_static::lazy_static! {
 
     static ref PLOT_INFO_TRACKS: Symbol = "track_count".try_into().unwrap();
     static ref PLOT_TRACK: Symbol = "track_point".try_into().unwrap();
+    //indicate if we're actively dumping
+    static ref DUMPING: Symbol = "dumping".try_into().unwrap();
 }
 
 const NOISE_BANDS: usize = 25;
@@ -171,6 +173,7 @@ external! {
 
         #[bang]
         pub fn bang(&mut self) {
+            self.outlet.send_anything(*DUMPING, &[1.into()]);
             if let Some(f) = &self.current {
                 self.send_file_info(f);
                 self.outlet.send_anything(*PLOT_INFO_TRACKS, &[f.header.par.into(), f.header.fra.into()]);
@@ -179,6 +182,7 @@ external! {
                 self.outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
                 self.outlet.send_anything(*PLOT_INFO_TRACKS, &[0f32.into(), 0f32.into()]);
             }
+            self.outlet.send_anything(*DUMPING, &[0.into()]);
         }
 
         #[sel]
