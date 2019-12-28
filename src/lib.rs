@@ -12,6 +12,8 @@ use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::slice;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 lazy_static::lazy_static! {
     static ref SAMPLE_RATE: Symbol = "sample_rate".try_into().unwrap();
@@ -141,17 +143,24 @@ external! {
     pub struct AtsDump {
         current: Option<AtsFile>,
         outlet: Box<dyn OutletSend>,
-        clock: Clock
+        clock: Clock,
+        waiting: AtomicUsize,
+        file_send: Sender<std::io::Result<AtsFile>>,
+        file_recv: Receiver<std::io::Result<AtsFile>>,
     }
 
     impl ControlExternal for AtsDump {
         fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
             let outlet = builder.new_message_outlet(OutletType::AnyThing);
-            let clock = Clock::new(builder.obj(), atsdump_method_done_trampoline);
+            let clock = Clock::new(builder.obj(), atsdump_method_poll_done_trampoline);
+            let (file_send, file_recv) = channel();
             Self {
                 outlet,
                 current: None,
                 clock,
+                waiting: Default::default(),
+                file_send,
+                file_recv
             }
         }
     }
@@ -219,23 +228,32 @@ external! {
 
         #[sel]
         pub fn open(&mut self, filename: Symbol) {
-            self.clock.delay(0.into());
-            self.current = match AtsFile::try_read(filename) {
-                Ok(f) => {
-                    self.post(format!("read {}", filename));
-                    Some(f)
-                },
-                Err(err) => {
-                    self.post(format!("error {}", err));
-                    None
-                }
-            };
-            self.bang();
+            let s = self.file_send.clone();
+            self.waiting.fetch_add(1, Ordering::SeqCst);
+            std::thread::spawn(move || s.send(AtsFile::try_read(filename)));
+            self.clock.delay(1f64);
         }
 
         #[tramp]
-        pub fn done(&mut self) {
-            self.post(format!("got done!"));
+        pub fn poll_done(&mut self) {
+            let mut waiting = 1;
+            if let Ok(res) = self.file_recv.try_recv() {
+                waiting = self.waiting.fetch_sub(1, Ordering::SeqCst) - 1;
+                self.current = match res {
+                    Ok(f) => {
+                        self.post(format!("read"));
+                        Some(f)
+                    },
+                    Err(err) => {
+                        self.post(format!("error {}", err));
+                        None
+                    }
+                };
+                self.bang();
+            }
+            if waiting != 0 {
+                self.clock.delay(1f64);
+            }
         }
     }
 }
