@@ -24,12 +24,20 @@ lazy_static::lazy_static! {
     static ref FILE_TYPE: Symbol = "file_type".try_into().unwrap();
 
     static ref PLOT_INFO_TRACKS: Symbol = "track_count".try_into().unwrap();
+    static ref PLOT_INFO_BANDS: Symbol = "noise_band".try_into().unwrap();
+
     static ref PLOT_TRACK: Symbol = "track_point".try_into().unwrap();
+    static ref PLOT_NOISE: Symbol = "noise_point".try_into().unwrap();
     //indicate if we're actively dumping
     static ref DUMPING: Symbol = "dumping".try_into().unwrap();
 }
 
 const NOISE_BANDS: usize = 25;
+static NOISE_BAND_EDGES: &[f64; NOISE_BANDS + 1] = &[
+    0.0, 100.0, 200.0, 300.0, 400.0, 510.0, 630.0, 770.0, 920.0, 1080.0, 1270.0, 1480.0, 1720.0,
+    2000.0, 2320.0, 2700.0, 3150.0, 3700.0, 4400.0, 5300.0, 6400.0, 7700.0, 9500.0, 12000.0,
+    15500.0, 20000.0,
+];
 
 enum AtsFileType {
     AmpFreq = 1,
@@ -149,12 +157,30 @@ external! {
             pd::post(CString::new(format!("atsdump: {}", v)).unwrap());
         }
 
+        fn send_noise_bands(&self) {
+            for i in 0..NOISE_BANDS {
+                let x0 = NOISE_BAND_EDGES[i];
+                let x1 = NOISE_BAND_EDGES[i + 1];
+                self.outlet.send_anything(*PLOT_INFO_BANDS, &[i.into(), x0.into(), x1.into()]);
+            }
+        }
+
         fn send_tracks(&self, f: &AtsFile) {
             //data is in frames, each frame has the same number of tracks
             //we output track index, frame index, freq, amp
             for (i, frame) in f.frames.iter().enumerate() {
                 for (j, track) in frame.iter().enumerate() {
                     self.outlet.send_anything(*PLOT_TRACK, &[j.into(), i.into(), track.freq.into(), track.amp.into()]);
+                }
+            }
+        }
+
+        fn send_noise(&self, f: &AtsFile) {
+            if let Some(n) = &f.noise {
+                for (i, frame) in n.iter().enumerate() {
+                    for (j, energy) in frame.iter().enumerate() {
+                        self.outlet.send_anything(*PLOT_NOISE, &[j.into(), i.into(), (*energy).into()]);
+                    }
                 }
             }
         }
@@ -175,9 +201,11 @@ external! {
         pub fn bang(&mut self) {
             self.outlet.send_anything(*DUMPING, &[1.into()]);
             if let Some(f) = &self.current {
+                self.send_noise_bands();
                 self.send_file_info(f);
                 self.outlet.send_anything(*PLOT_INFO_TRACKS, &[f.header.par.into(), f.header.fra.into()]);
                 self.send_tracks(f);
+                self.send_noise(f);
             } else {
                 self.outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
                 self.outlet.send_anything(*PLOT_INFO_TRACKS, &[0f32.into(), 0f32.into()]);
