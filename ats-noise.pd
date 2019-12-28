@@ -67,7 +67,7 @@
 #X obj 409 769 r \$0-win_samps;
 #X text 479 798 atsa variance;
 #X obj 391 846 sqrt;
-#X obj 98 486 bp~ 100 0.1;
+#X obj 98 486 bp~ 100 0.5;
 #X connect 0 0 55 0;
 #X connect 1 0 2 0;
 #X connect 2 0 56 0;
