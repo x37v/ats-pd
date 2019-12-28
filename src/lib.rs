@@ -1,6 +1,7 @@
 use ats_sys::ATS_HEADER;
 use byteorder::{LittleEndian, ReadBytesExt};
 use pd_ext::builder::ControlExternalBuilder;
+use pd_ext::clock::Clock;
 use pd_ext::external::ControlExternal;
 use pd_ext::outlet::{OutletSend, OutletType};
 use pd_ext::pd;
@@ -140,14 +141,17 @@ external! {
     pub struct AtsDump {
         current: Option<AtsFile>,
         outlet: Box<dyn OutletSend>,
+        clock: Clock
     }
 
     impl ControlExternal for AtsDump {
         fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
             let outlet = builder.new_message_outlet(OutletType::AnyThing);
+            let clock = Clock::new(builder.obj(), atsdump_method_done_trampoline);
             Self {
                 outlet,
-                current: None
+                current: None,
+                clock,
             }
         }
     }
@@ -215,6 +219,7 @@ external! {
 
         #[sel]
         pub fn open(&mut self, filename: Symbol) {
+            self.clock.delay(0.into());
             self.current = match AtsFile::try_read(filename) {
                 Ok(f) => {
                     self.post(format!("read {}", filename));
@@ -226,6 +231,11 @@ external! {
                 }
             };
             self.bang();
+        }
+
+        #[tramp]
+        pub fn done(&mut self) {
+            self.post(format!("got done!"));
         }
     }
 }
