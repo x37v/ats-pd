@@ -152,7 +152,7 @@ external! {
     impl ControlExternal for AtsDump {
         fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
             let outlet = builder.new_message_outlet(OutletType::AnyThing);
-            let clock = Clock::new(builder.obj(), atsdump_method_poll_done_trampoline);
+            let clock = Clock::new(builder.obj(), atsdump_poll_done_trampoline);
             let (file_send, file_recv) = channel();
             Self {
                 outlet,
