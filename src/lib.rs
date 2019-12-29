@@ -1,4 +1,4 @@
-use ats_sys::ATS_HEADER;
+use ats_sys::{ANARGS, ATS_HEADER};
 use byteorder::{LittleEndian, ReadBytesExt};
 use pd_ext::builder::ControlExternalBuilder;
 use pd_ext::clock::Clock;
@@ -232,6 +232,22 @@ external! {
             self.waiting.fetch_add(1, Ordering::SeqCst);
             std::thread::spawn(move || s.send(AtsFile::try_read(filename)));
             self.clock.delay(1f64);
+        }
+
+        #[sel]
+        pub fn anal(&mut self, _filename: Symbol) {
+            let infile = CString::new("/tmp/test.aif").unwrap().into_raw();
+            let outfile = CString::new("/tmp/test.ats").unwrap().into_raw();
+            let resfile = CString::new("/tmp/atsa_res.wav").unwrap().into_raw();
+
+            let mut args = Default::default();
+            unsafe {
+                let v = ats_sys::main_anal(infile, outfile, &mut args, resfile);
+                let _ = CString::from_raw(infile);
+                let _ = CString::from_raw(outfile);
+                let _ = CString::from_raw(resfile);
+                self.post(format!("anal {}", v));
+            }
         }
 
         #[tramp]
