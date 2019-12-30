@@ -4,7 +4,7 @@ use pd_ext::builder::ControlExternalBuilder;
 use pd_ext::clock::Clock;
 use pd_ext::external::ControlExternal;
 use pd_ext::outlet::{OutletSend, OutletType};
-use pd_ext::pd;
+use pd_ext::post::PdPost;
 use pd_ext::symbol::Symbol;
 use pd_ext_macros::external;
 use std::convert::TryInto;
@@ -144,6 +144,7 @@ external! {
         current: Option<AtsFile>,
         outlet: Box<dyn OutletSend>,
         clock: Clock,
+        post: Box<dyn PdPost>,
         waiting: AtomicUsize,
         file_send: Sender<std::io::Result<AtsFile>>,
         file_recv: Receiver<std::io::Result<AtsFile>>,
@@ -154,10 +155,12 @@ external! {
             let outlet = builder.new_message_outlet(OutletType::AnyThing);
             let clock = Clock::new(builder.obj(), atsdump_poll_done_trampoline);
             let (file_send, file_recv) = channel();
+            let post = builder.poster();
             Self {
                 outlet,
                 current: None,
                 clock,
+                post,
                 waiting: Default::default(),
                 file_send,
                 file_recv
@@ -166,10 +169,6 @@ external! {
     }
 
     impl AtsDump {
-        fn post(&self, v: String) {
-            pd::post(CString::new(format!("atsdump: {}", v)).unwrap());
-        }
-
         fn send_noise_bands(&self) {
             for i in 0..NOISE_BANDS {
                 let x0 = NOISE_BAND_EDGES[i];
@@ -235,6 +234,11 @@ external! {
         }
 
         #[sel]
+        pub fn anal_file(&mut self, args: &[pd_ext::atom::Atom]) {
+            //XXX
+        }
+
+        #[sel]
         pub fn anal(&mut self, _filename: Symbol) {
             let infile = CString::new("/tmp/test.aif").unwrap().into_raw();
             let outfile = CString::new("/tmp/test.ats").unwrap().into_raw();
@@ -246,7 +250,7 @@ external! {
                 let _ = CString::from_raw(infile);
                 let _ = CString::from_raw(outfile);
                 let _ = CString::from_raw(resfile);
-                self.post(format!("anal {}", v));
+                self.post.post(format!("anal {}", v));
             }
         }
 
@@ -257,11 +261,11 @@ external! {
                 waiting = self.waiting.fetch_sub(1, Ordering::SeqCst) - 1;
                 self.current = match res {
                     Ok(f) => {
-                        self.post(format!("read"));
+                        self.post.post(format!("read"));
                         Some(f)
                     },
                     Err(err) => {
-                        self.post(format!("error {}", err));
+                        self.post.post_error(format!("error {}", err));
                         None
                     }
                 };
