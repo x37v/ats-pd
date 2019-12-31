@@ -1,4 +1,4 @@
-#N canvas 2 74 835 707 10;
+#N canvas 2 74 1916 1004 10;
 #X declare -path .;
 #X obj 429 40 declare -path .;
 #X obj 111 236 atsdump;
@@ -27,13 +27,16 @@
 #X obj 45 360 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
 -1;
 #X obj 152 397 hsl 200 15 0 1 0 0 empty empty empty -2 -8 0 10 -262144
--1 -1 14600 1;
+-1 -1 0 1;
 #X obj 149 417 *;
 #X msg 149 439 \$1 30;
 #X obj 163 546 clone ats-noise 25;
 #X obj 115 641 +~;
 #X obj 106 674 dac~;
 #X msg 274 499 vis 11 1;
+#X obj 518 344 noise~;
+#X obj 531 430 dac~;
+#X msg 48 171 anal_file /tmp/clarinet.aif;
 #X connect 1 0 7 0;
 #X connect 2 0 3 0;
 #X connect 3 0 6 0;
@@ -68,3 +71,5 @@
 #X connect 27 0 28 0;
 #X connect 27 0 28 1;
 #X connect 29 0 26 1;
+#X connect 30 0 31 0;
+#X connect 32 0 1 0;
