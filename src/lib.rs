@@ -1,5 +1,6 @@
 use ats_sys::{ANARGS, ATS_HEADER};
 use byteorder::{LittleEndian, ReadBytesExt};
+use clap::{App, Arg};
 use pd_ext::builder::ControlExternalBuilder;
 use pd_ext::clock::Clock;
 use pd_ext::external::ControlExternal;
@@ -11,6 +12,7 @@ use std::convert::TryInto;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use std::path::Path;
 use std::slice;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -233,9 +235,106 @@ external! {
             self.clock.delay(1f64);
         }
 
+
+        fn extract_args(&self, args: &[pd_ext::atom::Atom]) -> Result<(String, ANARGS), String> {
+            let mut v = vec!["ats".to_string()];
+            let mut a = args.iter().map(|a| (*a).try_into()).collect::<Result<Vec<String>, _>>()?;
+            v.append(&mut a);
+            let matches = App::new("ats")
+                .arg(Arg::with_name("source")
+                    .index(1)
+                    .required(true)
+                )
+                //"\t -e duration (%f seconds or end)\n"         \
+                .arg(Arg::with_name("duration")
+                    .short("e")
+                    .long("duration")
+                    .takes_value(true)
+                )
+                //"\t -l lowest frequency (%f Hertz)\n"          \
+                .arg(Arg::with_name("lowest_frequency")
+                    .short("l")
+                    .long("lowest_freq")
+                    .takes_value(true)
+                )
+                //"\t -H highest frequency (%f Hertz)\n"         \
+                .arg(Arg::with_name("highest_frequency")
+                    .short("H")
+                    .long("highest_freq")
+                    .takes_value(true)
+                )
+                //"\t -d frequency deviation (%f of partial freq.)\n"    \
+                .arg(Arg::with_name("frequency_deviation")
+                    .short("d")
+                    .long("freq_dev")
+                    .takes_value(true)
+                )
+                //"\t -c window cycles (%d cycles)\n"                           \
+                .arg(Arg::with_name("window_cycles")
+                    .short("c")
+                    .long("window_cycles")
+                    .takes_value(true)
+                )
+                //"\t -w window type (type: %d)\n"                              \
+                .arg(Arg::with_name("window_type")
+                    .short("w")
+                    .long("window_type")
+                    .takes_value(true)
+                    //XXX options
+                )
+                //"\t\t(Options: 0=BLACKMAN, 1=BLACKMAN_H, 2=HAMMING, 3=VONHANN)\n" \
+                //"\t -h hop size (%f of window size)\n"                        \
+                .arg(Arg::with_name("hop_size")
+                    .short("h")
+                    .long("hop_size")
+                    .takes_value(true)
+                )
+                //"\t -m lowest magnitude (%f)\n"                               \
+                .arg(Arg::with_name("lowest_magnitude")
+                    .short("m")
+                    .long("lowest_mag")
+                    .takes_value(true)
+                )
+                //"\t -t track length (%d frames)\n"                            \
+                .arg(Arg::with_name("track_length")
+                    .short("t")
+                    .long("track_len")
+                    .takes_value(true)
+                )
+                //"\t -s min. segment length (%d frames)\n"                     \
+                //"\t -g min. gap length (%d frames)\n"                         \
+                //"\t -T SMR threshold (%f dB SPL)\n"                           \
+                //"\t -S min. segment SMR (%f dB SPL)\n"                        \
+                //"\t -P last peak contribution (%f of last peak's parameters)\n" \
+                //"\t -M SMR contribution (%f)\n"                               \
+                //"\t -F File Type (type: %d)\n"                                \
+                //"\t\t(Options: 1=amp.and freq. only, 2=amp.,freq. and phase, 3=amp.,freq. and residual, 4=amp.,freq.,phase, and residual)\n\n",
+                .get_matches_from_safe(v);
+
+            match matches {
+                Ok(m) => {
+                    let mut oargs: ANARGS = Default::default();
+                    let source = m.value_of("source").unwrap().into();
+                    Ok((source, oargs))
+                },
+                Err(m) => Err(m.message)
+            }
+        }
+
         #[sel]
         pub fn anal_file(&mut self, args: &[pd_ext::atom::Atom]) {
-            //XXX
+            let args = self.extract_args(args);
+            match args {
+                Ok((f, args)) => {
+                    if !Path::new(&f).exists() {
+                        self.post.post_error(format!("file does not exist {}", f));
+                    }
+                    //XXX
+                },
+                Err(err) => {
+                    self.post.post_error(err);
+                }
+            }
         }
 
         #[sel]
