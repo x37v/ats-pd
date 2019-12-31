@@ -12,7 +12,7 @@ use std::convert::TryInto;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -56,6 +56,19 @@ struct AtsFile {
     pub frames: Vec<Vec<Peak>>,
     pub noise: Option<Vec<[f64; NOISE_BANDS]>>,
     pub file_type: AtsFileType,
+}
+
+fn to_cstring(p: PathBuf) -> Result<CString, String> {
+    let s = p.to_str();
+    if let Some(s) = s {
+        if let Ok(s) = CString::new(s) {
+            Ok(s)
+        } else {
+            Err("cannot create Cstring".into())
+        }
+    } else {
+        Err("cannot create str".into())
+    }
 }
 
 impl AtsFile {
@@ -315,6 +328,7 @@ external! {
                 Ok(m) => {
                     let mut oargs: ANARGS = Default::default();
                     let source = m.value_of("source").unwrap().into();
+                    //XXX TODO
                     Ok((source, oargs))
                 },
                 Err(m) => Err(m.message)
@@ -325,11 +339,31 @@ external! {
         pub fn anal_file(&mut self, args: &[pd_ext::atom::Atom]) {
             let args = self.extract_args(args);
             match args {
-                Ok((f, args)) => {
+                Ok((f, mut args)) => {
                     if !Path::new(&f).exists() {
-                        self.post.post_error(format!("file does not exist {}", f));
+                        self.post.post_error(format!("file does not exist: {}", f));
+                    } else {
+                        if let Ok(dir) = tempfile::tempdir() {
+                            let infile = CString::new(f).unwrap().into_raw();
+                            let outfile = to_cstring(dir.path().join("out.ats"));
+                            let resfile = to_cstring(dir.path().join("atsa_res.wav"));
+                            if outfile.is_err() || resfile.is_err() {
+                                self.post.post_error("cannot get out or resfile paths".into());
+                                return;
+                            }
+                            let outfile = outfile.unwrap().into_raw();
+                            let resfile = resfile.unwrap().into_raw();
+                            unsafe {
+                                let v = ats_sys::main_anal(infile, outfile, &mut args, resfile);
+                                let _ = CString::from_raw(infile);
+                                let _ = CString::from_raw(outfile);
+                                let _ = CString::from_raw(resfile);
+                                self.post.post(format!("anal {}", v));
+                            }
+                        } else {
+                            self.post.post_error("failed to create tempdir".into());
+                        }
                     }
-                    //XXX
                 },
                 Err(err) => {
                     self.post.post_error(err);
