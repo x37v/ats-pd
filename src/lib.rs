@@ -256,7 +256,7 @@ external! {
 
         fn extract_args(&self, cmd_name: &str, args: &[pd_ext::atom::Atom]) -> Result<(String, ANARGS), String> {
             let v = args.iter().map(|a| (*a).try_into()).collect::<Result<Vec<String>, _>>()?;
-            let matches = App::new(cmd_name)
+            let mut app = App::new(cmd_name)
                 .setting(AppSettings::ArgRequiredElseHelp)
                 .setting(AppSettings::NoBinaryName)
                 .setting(AppSettings::ColorNever)
@@ -264,7 +264,6 @@ external! {
                 .setting(AppSettings::DisableHelpFlags)
                 .setting(AppSettings::DisableVersion)
                 .setting(AppSettings::DeriveDisplayOrder)
-                .setting(AppSettings::UnifiedHelpMessage)
                 .arg(Arg::with_name("source")
                     .index(1)
                     .required(true)
@@ -319,14 +318,14 @@ external! {
                     .short("m")
                     .long("lowest_mag")
                     .takes_value(true)
-                    .help("%f")
+                    .help("float")
                 )
                 //"\t -t track length (%d frames)\n"                            \
                 .arg(Arg::with_name("track_length")
                     .short("t")
                     .long("track_len")
                     .takes_value(true)
-                    .help("%d frames")
+                    .help("int frames")
                 )
                 //"\t -s min. segment length (%d frames)\n"                     \
                 //"\t -g min. gap length (%d frames)\n"                         \
@@ -336,7 +335,8 @@ external! {
                 //"\t -M SMR contribution (%f)\n"                               \
                 //"\t -F File Type (type: %d)\n"                                \
                 //"\t\t(Options: 1=amp.and freq. only, 2=amp.,freq. and phase, 3=amp.,freq. and residual, 4=amp.,freq.,phase, and residual)\n\n",
-                .get_matches_from_safe(v);
+                ;
+            let matches = app.clone().get_matches_from_safe(v);
 
             match matches {
                 Ok(m) => {
@@ -368,7 +368,16 @@ external! {
                     }
                     Ok((source, oargs))
                 },
-                Err(m) => Err(m.message)
+                Err(m) => {
+                    let mut help = Vec::new();
+                    let _ = app.write_long_help(&mut help);
+                    let help = String::from_utf8(help);
+                    if let Ok(help) = help {
+                        Err(format!("{} {}", m.message, help))
+                    } else {
+                        Err(m.message)
+                    }
+                }
             }
         }
 
