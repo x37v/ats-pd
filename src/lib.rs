@@ -12,6 +12,7 @@ use std::convert::TryInto;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use std::os::raw::c_int;
 use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -56,6 +57,10 @@ struct AtsFile {
     pub frames: Vec<Vec<Peak>>,
     pub noise: Option<Vec<[f64; NOISE_BANDS]>>,
     pub file_type: AtsFileType,
+}
+
+fn stringify<E: std::fmt::Display>(x: E) -> String {
+    format!("error code: {}", x)
 }
 
 fn to_cstring(p: PathBuf) -> Result<CString, String> {
@@ -328,7 +333,30 @@ external! {
                 Ok(m) => {
                     let mut oargs: ANARGS = Default::default();
                     let source = m.value_of("source").unwrap().into();
-                    //XXX TODO
+                    if let Some(v) = m.value_of("duration") {
+                        oargs.duration = v.parse::<f32>().map_err(stringify)?;
+                    }
+                    if let Some(v) = m.value_of("lowest_frequency") {
+                        oargs.lowest_freq = v.parse::<f32>().map_err(stringify)?;
+                    }
+                    if let Some(v) = m.value_of("highest_frequency") {
+                        oargs.highest_freq = v.parse::<f32>().map_err(stringify)?;
+                    }
+                    if let Some(v) = m.value_of("frequency_deviation") {
+                        oargs.freq_dev = v.parse::<f32>().map_err(stringify)?;
+                    }
+                    if let Some(v) = m.value_of("window_cycles") {
+                        oargs.win_cycles = v.parse::<c_int>().map_err(stringify)?;
+                    }
+                    if let Some(v) = m.value_of("window_type") {
+                        oargs.win_type = v.parse::<c_int>().map_err(stringify)?;
+                    }
+                    if let Some(v) = m.value_of("hop_size") {
+                        oargs.hop_size = v.parse::<f32>().map_err(stringify)?;
+                    }
+                    if let Some(v) = m.value_of("track_length") {
+                        oargs.track_len = v.parse::<c_int>().map_err(stringify)?;
+                    }
                     Ok((source, oargs))
                 },
                 Err(m) => Err(m.message)
