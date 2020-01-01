@@ -1,6 +1,6 @@
 use ats_sys::{ANARGS, ATS_HEADER};
 use byteorder::{LittleEndian, ReadBytesExt};
-use clap::{App, Arg};
+use clap::{App, AppSettings, Arg};
 use pd_ext::builder::ControlExternalBuilder;
 use pd_ext::clock::Clock;
 use pd_ext::external::ControlExternal;
@@ -254,13 +254,21 @@ external! {
         }
 
 
-        fn extract_args(&self, args: &[pd_ext::atom::Atom]) -> Result<(String, ANARGS), String> {
+        fn extract_args(&self, cmd_name: &str, args: &[pd_ext::atom::Atom]) -> Result<(String, ANARGS), String> {
             let v = args.iter().map(|a| (*a).try_into()).collect::<Result<Vec<String>, _>>()?;
-            let matches = App::new("ats")
-                .setting(clap::AppSettings::NoBinaryName)
+            let matches = App::new(cmd_name)
+                .setting(AppSettings::ArgRequiredElseHelp)
+                .setting(AppSettings::NoBinaryName)
+                .setting(AppSettings::ColorNever)
+                .setting(AppSettings::DisableHelpSubcommand)
+                .setting(AppSettings::DisableHelpFlags)
+                .setting(AppSettings::DisableVersion)
+                .setting(AppSettings::DeriveDisplayOrder)
+                .setting(AppSettings::UnifiedHelpMessage)
                 .arg(Arg::with_name("source")
                     .index(1)
                     .required(true)
+                    .help("the thing you want to analyize")
                 )
                 //"\t -e duration (%f seconds or end)\n"         \
                 .arg(Arg::with_name("duration")
@@ -311,12 +319,14 @@ external! {
                     .short("m")
                     .long("lowest_mag")
                     .takes_value(true)
+                    .help("%f")
                 )
                 //"\t -t track length (%d frames)\n"                            \
                 .arg(Arg::with_name("track_length")
                     .short("t")
                     .long("track_len")
                     .takes_value(true)
+                    .help("%d frames")
                 )
                 //"\t -s min. segment length (%d frames)\n"                     \
                 //"\t -g min. gap length (%d frames)\n"                         \
@@ -364,7 +374,7 @@ external! {
 
         #[sel]
         pub fn anal_file(&mut self, args: &[pd_ext::atom::Atom]) {
-            let args = self.extract_args(args);
+            let args = self.extract_args("anal_file", args);
             match args {
                 Ok((f, mut args)) => {
                     if !Path::new(&f).exists() {
