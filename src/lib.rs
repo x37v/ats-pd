@@ -293,8 +293,8 @@ external! {
         clock: Clock,
         post: Box<dyn PdPost>,
         waiting: AtomicUsize,
-        file_send: Sender<Result<AtsFile, String>>,
-        file_recv: Receiver<Result<AtsFile, String>>,
+        file_send: Sender<Result<(AtsFile, String), String>>,
+        file_recv: Receiver<Result<(AtsFile, String), String>>,
     }
 
     impl ControlExternal for AtsDump {
@@ -374,7 +374,7 @@ external! {
 
         #[sel]
         pub fn open(&mut self, filename: Symbol) {
-            self.queue_job(move || AtsFile::try_read(filename).map_err(stringify));
+            self.queue_job(move || AtsFile::try_read(filename).map_err(stringify).map(|r| (r, filename.into())))
         }
 
 
@@ -408,9 +408,8 @@ external! {
                                             let _ = CString::from_raw(infile);
                                             let _ = CString::from_raw(outfile);
                                             let _ = CString::from_raw(resfile);
-
                                             match v {
-                                                0 => AtsFile::try_read(outpath).map_err(stringify),
+                                                0 => AtsFile::try_read(outpath).map_err(stringify).map(|r| (r, f)),
                                                 e @ _ => Err(format!("failed to analyize file: {} with error num: {}", f, e))
                                             }
                                         }
@@ -430,7 +429,7 @@ external! {
             }
         }
 
-        fn queue_job<F: 'static + Send + FnOnce() -> Result<AtsFile, String>>(&mut self, job: F) {
+        fn queue_job<F: 'static + Send + FnOnce() -> Result<(AtsFile, String), String>>(&mut self, job: F) {
             let s = self.file_send.clone();
             self.waiting.fetch_add(1, Ordering::SeqCst);
             std::thread::spawn(move || s.send(job()));
@@ -443,8 +442,8 @@ external! {
             if let Ok(res) = self.file_recv.try_recv() {
                 waiting = self.waiting.fetch_sub(1, Ordering::SeqCst) - 1;
                 self.current = match res {
-                    Ok(f) => {
-                        self.post.post(format!("read"));
+                    Ok((f, filename)) => {
+                        self.post.post(format!("read {}", filename));
                         Some(f)
                     },
                     Err(err) => {
