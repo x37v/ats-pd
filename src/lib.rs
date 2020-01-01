@@ -255,10 +255,9 @@ external! {
 
 
         fn extract_args(&self, args: &[pd_ext::atom::Atom]) -> Result<(String, ANARGS), String> {
-            let mut v = vec!["ats".to_string()];
-            let mut a = args.iter().map(|a| (*a).try_into()).collect::<Result<Vec<String>, _>>()?;
-            v.append(&mut a);
+            let v = args.iter().map(|a| (*a).try_into()).collect::<Result<Vec<String>, _>>()?;
             let matches = App::new("ats")
+                .setting(clap::AppSettings::NoBinaryName)
                 .arg(Arg::with_name("source")
                     .index(1)
                     .required(true)
