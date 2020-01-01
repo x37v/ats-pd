@@ -422,22 +422,6 @@ external! {
             }
         }
 
-        #[sel]
-        pub fn anal(&mut self, _filename: Symbol) {
-            let infile = CString::new("/tmp/test.aif").unwrap().into_raw();
-            let outfile = CString::new("/tmp/test.ats").unwrap().into_raw();
-            let resfile = CString::new("/tmp/atsa_res.wav").unwrap().into_raw();
-
-            let mut args = Default::default();
-            unsafe {
-                let v = ats_sys::main_anal(infile, outfile, &mut args, resfile);
-                let _ = CString::from_raw(infile);
-                let _ = CString::from_raw(outfile);
-                let _ = CString::from_raw(resfile);
-                self.post.post(format!("anal {}", v));
-            }
-        }
-
         #[tramp]
         pub fn poll_done(&mut self) {
             let mut waiting = 1;
