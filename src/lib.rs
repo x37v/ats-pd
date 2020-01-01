@@ -344,21 +344,26 @@ external! {
                         self.post.post_error(format!("file does not exist: {}", f));
                     } else {
                         if let Ok(dir) = tempfile::tempdir() {
-                            let infile = CString::new(f).unwrap().into_raw();
-                            let outfile = to_cstring(dir.path().join("out.ats"));
+                            let outpath = dir.path().join("out.ats");
+                            let infile = CString::new(f.clone()).unwrap().into_raw();
+                            let outfile = to_cstring(outpath.clone());
                             let resfile = to_cstring(dir.path().join("atsa_res.wav"));
                             if outfile.is_err() || resfile.is_err() {
                                 self.post.post_error("cannot get out or resfile paths".into());
-                                return;
-                            }
-                            let outfile = outfile.unwrap().into_raw();
-                            let resfile = resfile.unwrap().into_raw();
-                            unsafe {
-                                let v = ats_sys::main_anal(infile, outfile, &mut args, resfile);
-                                let _ = CString::from_raw(infile);
-                                let _ = CString::from_raw(outfile);
-                                let _ = CString::from_raw(resfile);
-                                self.post.post(format!("anal {}", v));
+                            } else {
+                                let outfile = outfile.unwrap().into_raw();
+                                let resfile = resfile.unwrap().into_raw();
+                                unsafe {
+                                    let v = ats_sys::main_anal(infile, outfile, &mut args, resfile);
+                                    //cleanup constructed cstring
+                                    let _ = CString::from_raw(infile);
+                                    let _ = CString::from_raw(outfile);
+                                    let _ = CString::from_raw(resfile);
+                                    match v {
+                                        0 => self.post.post(format!("analyized file {}", f)),
+                                        e @ _ => self.post.post_error(format!("failed to analyize file: {} with error num: {}", f, e))
+                                    };
+                                }
                             }
                         } else {
                             self.post.post_error("failed to create tempdir".into());
