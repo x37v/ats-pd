@@ -76,6 +76,133 @@ fn to_cstring(p: PathBuf) -> Result<CString, String> {
     }
 }
 
+fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), String> {
+    let mut app = 
+        App::new(cmd_name)
+        .setting(AppSettings::ArgRequiredElseHelp)
+        .setting(AppSettings::NoBinaryName)
+        .setting(AppSettings::ColorNever)
+        .setting(AppSettings::DisableHelpSubcommand)
+        .setting(AppSettings::DisableHelpFlags)
+        .setting(AppSettings::DisableVersion)
+        .setting(AppSettings::DeriveDisplayOrder)
+        .arg(Arg::with_name("source")
+            .index(1)
+            .required(true)
+            .help("the thing you want to analyize")
+        )
+        //"\t -e duration (%f seconds or end)\n"         \
+        .arg(Arg::with_name("duration")
+            .short("e")
+            .long("duration")
+            .takes_value(true)
+        )
+        //"\t -l lowest frequency (%f Hertz)\n"          \
+        .arg(Arg::with_name("lowest_frequency")
+            .short("l")
+            .long("lowest_freq")
+            .takes_value(true)
+        )
+        //"\t -H highest frequency (%f Hertz)\n"         \
+        .arg(Arg::with_name("highest_frequency")
+            .short("H")
+            .long("highest_freq")
+            .takes_value(true)
+        )
+        //"\t -d frequency deviation (%f of partial freq.)\n"    \
+        .arg(Arg::with_name("frequency_deviation")
+            .short("d")
+            .long("freq_dev")
+            .takes_value(true)
+        )
+        //"\t -c window cycles (%d cycles)\n"                           \
+        .arg(Arg::with_name("window_cycles")
+            .short("c")
+            .long("window_cycles")
+            .takes_value(true)
+        )
+        //"\t -w window type (type: %d)\n"                              \
+        .arg(Arg::with_name("window_type")
+            .short("w")
+            .long("window_type")
+            .takes_value(true)
+            //XXX options
+        )
+        //"\t\t(Options: 0=BLACKMAN, 1=BLACKMAN_H, 2=HAMMING, 3=VONHANN)\n" \
+        //"\t -h hop size (%f of window size)\n"                        \
+        .arg(Arg::with_name("hop_size")
+            .short("h")
+            .long("hop_size")
+            .takes_value(true)
+        )
+        //"\t -m lowest magnitude (%f)\n"                               \
+        .arg(Arg::with_name("lowest_magnitude")
+            .short("m")
+            .long("lowest_mag")
+            .takes_value(true)
+            .help("float")
+        )
+        //"\t -t track length (%d frames)\n"                            \
+        .arg(Arg::with_name("track_length")
+            .short("t")
+            .long("track_len")
+            .takes_value(true)
+            .help("int frames")
+        )
+        //"\t -s min. segment length (%d frames)\n"                     \
+        //"\t -g min. gap length (%d frames)\n"                         \
+        //"\t -T SMR threshold (%f dB SPL)\n"                           \
+        //"\t -S min. segment SMR (%f dB SPL)\n"                        \
+        //"\t -P last peak contribution (%f of last peak's parameters)\n" \
+        //"\t -M SMR contribution (%f)\n"                               \
+        //"\t -F File Type (type: %d)\n"                                \
+        //"\t\t(Options: 1=amp.and freq. only, 2=amp.,freq. and phase, 3=amp.,freq. and residual, 4=amp.,freq.,phase, and residual)\n\n",
+        ;
+    let matches = app.clone().get_matches_from_safe(args);
+
+    match matches {
+        Ok(m) => {
+            let mut oargs: ANARGS = Default::default();
+            let source = m.value_of("source").unwrap().into();
+            if let Some(v) = m.value_of("duration") {
+                oargs.duration = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("lowest_frequency") {
+                oargs.lowest_freq = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("highest_frequency") {
+                oargs.highest_freq = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("frequency_deviation") {
+                oargs.freq_dev = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("window_cycles") {
+                oargs.win_cycles = v.parse::<c_int>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("window_type") {
+                oargs.win_type = v.parse::<c_int>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("hop_size") {
+                oargs.hop_size = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("track_length") {
+                oargs.track_len = v.parse::<c_int>().map_err(stringify)?;
+            }
+            Ok((source, oargs))
+        }
+        Err(m) => {
+            let mut help = Vec::new();
+            let _ = app.write_long_help(&mut help);
+            let help = String::from_utf8(help);
+            if let Ok(help) = help {
+                Err(format!("{} {}", m.message, help))
+            } else {
+                Err(m.message)
+            }
+        }
+    }
+}
+
 impl AtsFile {
     pub fn try_read<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
         let mut header: std::mem::MaybeUninit<ATS_HEADER> = std::mem::MaybeUninit::uninit();
@@ -166,8 +293,8 @@ external! {
         clock: Clock,
         post: Box<dyn PdPost>,
         waiting: AtomicUsize,
-        file_send: Sender<std::io::Result<AtsFile>>,
-        file_recv: Receiver<std::io::Result<AtsFile>>,
+        file_send: Sender<Result<AtsFile, String>>,
+        file_recv: Receiver<Result<AtsFile, String>>,
     }
 
     impl ControlExternal for AtsDump {
@@ -247,179 +374,67 @@ external! {
 
         #[sel]
         pub fn open(&mut self, filename: Symbol) {
-            let s = self.file_send.clone();
-            self.waiting.fetch_add(1, Ordering::SeqCst);
-            std::thread::spawn(move || s.send(AtsFile::try_read(filename)));
-            self.clock.delay(1f64);
+            self.queue_job(move || AtsFile::try_read(filename).map_err(stringify));
         }
 
-
-        fn extract_args(&self, cmd_name: &str, args: &[pd_ext::atom::Atom]) -> Result<(String, ANARGS), String> {
-            let v = args.iter().map(|a| (*a).try_into()).collect::<Result<Vec<String>, _>>()?;
-            let mut app = App::new(cmd_name)
-                .setting(AppSettings::ArgRequiredElseHelp)
-                .setting(AppSettings::NoBinaryName)
-                .setting(AppSettings::ColorNever)
-                .setting(AppSettings::DisableHelpSubcommand)
-                .setting(AppSettings::DisableHelpFlags)
-                .setting(AppSettings::DisableVersion)
-                .setting(AppSettings::DeriveDisplayOrder)
-                .arg(Arg::with_name("source")
-                    .index(1)
-                    .required(true)
-                    .help("the thing you want to analyize")
-                )
-                //"\t -e duration (%f seconds or end)\n"         \
-                .arg(Arg::with_name("duration")
-                    .short("e")
-                    .long("duration")
-                    .takes_value(true)
-                )
-                //"\t -l lowest frequency (%f Hertz)\n"          \
-                .arg(Arg::with_name("lowest_frequency")
-                    .short("l")
-                    .long("lowest_freq")
-                    .takes_value(true)
-                )
-                //"\t -H highest frequency (%f Hertz)\n"         \
-                .arg(Arg::with_name("highest_frequency")
-                    .short("H")
-                    .long("highest_freq")
-                    .takes_value(true)
-                )
-                //"\t -d frequency deviation (%f of partial freq.)\n"    \
-                .arg(Arg::with_name("frequency_deviation")
-                    .short("d")
-                    .long("freq_dev")
-                    .takes_value(true)
-                )
-                //"\t -c window cycles (%d cycles)\n"                           \
-                .arg(Arg::with_name("window_cycles")
-                    .short("c")
-                    .long("window_cycles")
-                    .takes_value(true)
-                )
-                //"\t -w window type (type: %d)\n"                              \
-                .arg(Arg::with_name("window_type")
-                    .short("w")
-                    .long("window_type")
-                    .takes_value(true)
-                    //XXX options
-                )
-                //"\t\t(Options: 0=BLACKMAN, 1=BLACKMAN_H, 2=HAMMING, 3=VONHANN)\n" \
-                //"\t -h hop size (%f of window size)\n"                        \
-                .arg(Arg::with_name("hop_size")
-                    .short("h")
-                    .long("hop_size")
-                    .takes_value(true)
-                )
-                //"\t -m lowest magnitude (%f)\n"                               \
-                .arg(Arg::with_name("lowest_magnitude")
-                    .short("m")
-                    .long("lowest_mag")
-                    .takes_value(true)
-                    .help("float")
-                )
-                //"\t -t track length (%d frames)\n"                            \
-                .arg(Arg::with_name("track_length")
-                    .short("t")
-                    .long("track_len")
-                    .takes_value(true)
-                    .help("int frames")
-                )
-                //"\t -s min. segment length (%d frames)\n"                     \
-                //"\t -g min. gap length (%d frames)\n"                         \
-                //"\t -T SMR threshold (%f dB SPL)\n"                           \
-                //"\t -S min. segment SMR (%f dB SPL)\n"                        \
-                //"\t -P last peak contribution (%f of last peak's parameters)\n" \
-                //"\t -M SMR contribution (%f)\n"                               \
-                //"\t -F File Type (type: %d)\n"                                \
-                //"\t\t(Options: 1=amp.and freq. only, 2=amp.,freq. and phase, 3=amp.,freq. and residual, 4=amp.,freq.,phase, and residual)\n\n",
-                ;
-            let matches = app.clone().get_matches_from_safe(v);
-
-            match matches {
-                Ok(m) => {
-                    let mut oargs: ANARGS = Default::default();
-                    let source = m.value_of("source").unwrap().into();
-                    if let Some(v) = m.value_of("duration") {
-                        oargs.duration = v.parse::<f32>().map_err(stringify)?;
-                    }
-                    if let Some(v) = m.value_of("lowest_frequency") {
-                        oargs.lowest_freq = v.parse::<f32>().map_err(stringify)?;
-                    }
-                    if let Some(v) = m.value_of("highest_frequency") {
-                        oargs.highest_freq = v.parse::<f32>().map_err(stringify)?;
-                    }
-                    if let Some(v) = m.value_of("frequency_deviation") {
-                        oargs.freq_dev = v.parse::<f32>().map_err(stringify)?;
-                    }
-                    if let Some(v) = m.value_of("window_cycles") {
-                        oargs.win_cycles = v.parse::<c_int>().map_err(stringify)?;
-                    }
-                    if let Some(v) = m.value_of("window_type") {
-                        oargs.win_type = v.parse::<c_int>().map_err(stringify)?;
-                    }
-                    if let Some(v) = m.value_of("hop_size") {
-                        oargs.hop_size = v.parse::<f32>().map_err(stringify)?;
-                    }
-                    if let Some(v) = m.value_of("track_length") {
-                        oargs.track_len = v.parse::<c_int>().map_err(stringify)?;
-                    }
-                    Ok((source, oargs))
-                },
-                Err(m) => {
-                    let mut help = Vec::new();
-                    let _ = app.write_long_help(&mut help);
-                    let help = String::from_utf8(help);
-                    if let Ok(help) = help {
-                        Err(format!("{} {}", m.message, help))
-                    } else {
-                        Err(m.message)
-                    }
-                }
-            }
-        }
 
         #[sel]
         pub fn anal_file(&mut self, args: &[pd_ext::atom::Atom]) {
-            let args = self.extract_args("anal_file", args);
-            match args {
-                Ok((f, mut args)) => {
-                    if !Path::new(&f).exists() {
-                        self.post.post_error(format!("file does not exist: {}", f));
-                    } else {
-                        if let Ok(dir) = tempfile::tempdir() {
-                            let outpath = dir.path().join("out.ats");
-                            let infile = CString::new(f.clone()).unwrap().into_raw();
-                            let outfile = to_cstring(outpath.clone());
-                            let resfile = to_cstring(dir.path().join("atsa_res.wav"));
-                            if outfile.is_err() || resfile.is_err() {
-                                self.post.post_error("cannot get out or resfile paths".into());
+            let args = args
+                .iter()
+                .map(|a| (*a).try_into())
+                .collect::<Result<Vec<String>, _>>();
+            if let Ok(args) = args {
+                self.queue_job(|| {
+                    let args = extract_args("anal_file", args);
+                    match args {
+                        Ok((f, mut args)) => {
+                            if !Path::new(&f).exists() {
+                                Err(format!("file does not exist: {}", f))
                             } else {
-                                let outfile = outfile.unwrap().into_raw();
-                                let resfile = resfile.unwrap().into_raw();
-                                unsafe {
-                                    let v = ats_sys::main_anal(infile, outfile, &mut args, resfile);
-                                    //cleanup constructed cstring
-                                    let _ = CString::from_raw(infile);
-                                    let _ = CString::from_raw(outfile);
-                                    let _ = CString::from_raw(resfile);
-                                    match v {
-                                        0 => self.post.post(format!("analyized file {}", f)),
-                                        e @ _ => self.post.post_error(format!("failed to analyize file: {} with error num: {}", f, e))
-                                    };
+                                if let Ok(dir) = tempfile::tempdir() {
+                                    let outpath = dir.path().join("out.ats");
+                                    let infile = CString::new(f.clone()).unwrap().into_raw();
+                                    let outfile = to_cstring(outpath.clone());
+                                    let resfile = to_cstring(dir.path().join("atsa_res.wav"));
+                                    if outfile.is_err() || resfile.is_err() {
+                                        Err("cannot get out or resfile paths".into())
+                                    } else {
+                                        let outfile = outfile.unwrap().into_raw();
+                                        let resfile = resfile.unwrap().into_raw();
+                                        unsafe {
+                                            let v = ats_sys::main_anal(infile, outfile, &mut args, resfile);
+                                            //cleanup constructed cstring
+                                            let _ = CString::from_raw(infile);
+                                            let _ = CString::from_raw(outfile);
+                                            let _ = CString::from_raw(resfile);
+
+                                            match v {
+                                                0 => AtsFile::try_read(outpath).map_err(stringify),
+                                                e @ _ => Err(format!("failed to analyize file: {} with error num: {}", f, e))
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Err("failed to create tempdir".into())
                                 }
                             }
-                        } else {
-                            self.post.post_error("failed to create tempdir".into());
+                        },
+                        Err(e) => {
+                            Err(e)
                         }
                     }
-                },
-                Err(err) => {
-                    self.post.post_error(err);
-                }
+                });
+            } else {
+                self.post.post_error("failed to convert args to a string array".into());
             }
+        }
+
+        fn queue_job<F: 'static + Send + FnOnce() -> Result<AtsFile, String>>(&mut self, job: F) {
+            let s = self.file_send.clone();
+            self.waiting.fetch_add(1, Ordering::SeqCst);
+            std::thread::spawn(move || s.send(job()));
+            self.clock.delay(1f64);
         }
 
         #[tramp]
