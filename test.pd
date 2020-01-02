@@ -1,4 +1,4 @@
-#N canvas 831 95 533 958 10;
+#N canvas 2 74 533 958 10;
 #X declare -path .;
 #X obj 429 40 declare -path .;
 #X obj 110 452 atsdump;
@@ -40,8 +40,8 @@
 #X obj 110 336 t a b;
 #X obj 45 334 t a b;
 #X msg 44 643 0 \, \$2 \$3 \, 0 0 \$3;
-#X msg 112 85 anal_file -c 4 -h 0.25 -g 4 -s 4 -t 6 -T 30 -S 60 -d
-0.1 -w 1 -F 4 -l 100 -M 0.5 \$1;
+#X msg 113 84 anal_file -c 4 -h 0.25 -g 4 -s 4 -t 2 -T 30 -S 60 -d
+0.1 -w 1 -F 4 -l 100 -M 0.5 -P 0.1 \$1;
 #X connect 1 0 6 0;
 #X connect 2 0 3 0;
 #X connect 3 0 33 0;
