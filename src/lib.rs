@@ -76,9 +76,8 @@ fn to_cstring(p: PathBuf) -> Result<CString, String> {
     }
 }
 
-fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), String> {
-    let mut app = 
-        App::new(cmd_name)
+fn create_app(cmd_name: &str) -> App {
+    App::new(cmd_name)
         .setting(AppSettings::ArgRequiredElseHelp)
         .setting(AppSettings::NoBinaryName)
         .setting(AppSettings::ColorNever)
@@ -96,44 +95,50 @@ fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), S
             .short("e")
             .long("duration")
             .takes_value(true)
+            .help("float seconds, defaults to the whole soundfile")
         )
         //"\t -l lowest frequency (%f Hertz)\n"          \
         .arg(Arg::with_name("lowest_frequency")
             .short("l")
             .long("lowest_freq")
             .takes_value(true)
+            .help("float Hertz")
         )
         //"\t -H highest frequency (%f Hertz)\n"         \
         .arg(Arg::with_name("highest_frequency")
             .short("H")
             .long("highest_freq")
             .takes_value(true)
+            .help("float Hertz")
         )
         //"\t -d frequency deviation (%f of partial freq.)\n"    \
         .arg(Arg::with_name("frequency_deviation")
             .short("d")
             .long("freq_dev")
             .takes_value(true)
+            .help("float of partial freq")
         )
         //"\t -c window cycles (%d cycles)\n"                           \
         .arg(Arg::with_name("window_cycles")
             .short("c")
             .long("window_cycles")
             .takes_value(true)
+            .help("int number of cycles")
         )
         //"\t -w window type (type: %d)\n"                              \
         .arg(Arg::with_name("window_type")
             .short("w")
             .long("window_type")
             .takes_value(true)
-            //XXX options
+            .possible_values(&["0","1","2","3"])
+            .help("0=BLACKMAN, 1=BLACKMAN_H, 2=HAMMING, 3=VONHANN")
         )
-        //"\t\t(Options: 0=BLACKMAN, 1=BLACKMAN_H, 2=HAMMING, 3=VONHANN)\n" \
         //"\t -h hop size (%f of window size)\n"                        \
         .arg(Arg::with_name("hop_size")
             .short("h")
             .long("hop_size")
             .takes_value(true)
+            .help("float, portion of window size")
         )
         //"\t -m lowest magnitude (%f)\n"                               \
         .arg(Arg::with_name("lowest_magnitude")
@@ -150,14 +155,60 @@ fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), S
             .help("int frames")
         )
         //"\t -s min. segment length (%d frames)\n"                     \
+        .arg(Arg::with_name("min_segment_length")
+            .short("s")
+            .long("min_seg_len")
+            .takes_value(true)
+            .help("int frames")
+        )
         //"\t -g min. gap length (%d frames)\n"                         \
+        .arg(Arg::with_name("min_gap_length")
+            .short("g")
+            .long("min_gap_len")
+            .takes_value(true)
+            .help("int frames")
+        )
         //"\t -T SMR threshold (%f dB SPL)\n"                           \
+        .arg(Arg::with_name("smr_threshold")
+            .short("T")
+            .long("smr_thresh")
+            .takes_value(true)
+            .help("float dB SPL")
+        )
         //"\t -S min. segment SMR (%f dB SPL)\n"                        \
+        .arg(Arg::with_name("min_segment_smr")
+            .short("S")
+            .long("min_seg_smr")
+            .takes_value(true)
+            .help("float dB SPL")
+        )
         //"\t -P last peak contribution (%f of last peak's parameters)\n" \
+        .arg(Arg::with_name("last_peak_contribution")
+            .short("P")
+            .long("last_peak_cont")
+            .takes_value(true)
+            .help("float, of last peak's parameters")
+        )
         //"\t -M SMR contribution (%f)\n"                               \
+        .arg(Arg::with_name("smr_contribution")
+            .short("M")
+            .long("smr_cont")
+            .takes_value(true)
+            .help("float")
+        )
         //"\t -F File Type (type: %d)\n"                                \
         //"\t\t(Options: 1=amp.and freq. only, 2=amp.,freq. and phase, 3=amp.,freq. and residual, 4=amp.,freq.,phase, and residual)\n\n",
-        ;
+        .arg(Arg::with_name("file_type")
+            .short("F")
+            .long("file_type")
+            .takes_value(true)
+            .possible_values(&["1", "2", "3", "4"])
+            .help("Options: 1=amp.and freq. only, 2=amp.,freq. and phase, 3=amp.,freq. and residual, 4=amp.,freq.,phase, and residual")
+        )
+}
+
+fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), String> {
+    let mut app = create_app(cmd_name);
     let matches = app.clone().get_matches_from_safe(args);
 
     match matches {
@@ -187,6 +238,27 @@ fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), S
             }
             if let Some(v) = m.value_of("track_length") {
                 oargs.track_len = v.parse::<c_int>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("min_segment_length") {
+                oargs.min_seg_len = v.parse::<c_int>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("min_gap_length") {
+                oargs.min_gap_len = v.parse::<c_int>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("smr_threshold") {
+                oargs.SMR_thres = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("min_segment_smr") {
+                oargs.min_seg_SMR = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("last_peak_contribution") {
+                oargs.last_peak_cont = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("smr_contribution") {
+                oargs.SMR_cont = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("file_type") {
+                oargs.type_ = v.parse::<c_int>().map_err(stringify)?;
             }
             Ok((source, oargs))
         }
@@ -377,6 +449,17 @@ external! {
             self.queue_job(move || AtsFile::try_read(filename).map_err(stringify).map(|r| (r, filename.into())))
         }
 
+        #[sel]
+        pub fn help(&mut self) {
+            let mut app = create_app("anal_file");
+            let mut help = Vec::new();
+            if app.write_long_help(&mut help).is_ok() {
+                let help = String::from_utf8(help);
+                if let Ok(help) = help {
+                    self.post.post(help);
+                }
+            }
+        }
 
         #[sel]
         pub fn anal_file(&mut self, args: &[pd_ext::atom::Atom]) {
