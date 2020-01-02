@@ -5,3 +5,6 @@
 *.pd_*
 Cargo.lock
 *.ats
+ats-wisdom
+*.snd
+*.aif
