@@ -530,7 +530,7 @@ external! {
                         Some(f)
                     },
                     Err(err) => {
-                        self.post.post_error(format!("error {}", err));
+                        self.post.post_error(err);
                         None
                     }
                 };
