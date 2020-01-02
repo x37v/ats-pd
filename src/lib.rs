@@ -76,6 +76,10 @@ fn to_cstring(p: PathBuf) -> Result<CString, String> {
     }
 }
 
+fn energy_rms(value: f64, window_size: f64) -> f64 {
+    (value / (window_size * 0.04f64)).sqrt()
+}
+
 fn create_app(cmd_name: &str) -> App {
     App::new(cmd_name)
         .setting(AppSettings::ArgRequiredElseHelp)
@@ -308,20 +312,43 @@ impl AtsFile {
 
             let mut frames = Vec::new();
             let mut noise = Vec::new();
+            let mut partialband: Vec<usize> = std::iter::repeat(0usize)
+                .take(header.par as usize)
+                .collect();
+
+            let bands: Vec<(usize, f64, f64)> = NOISE_BAND_EDGES[0..NOISE_BANDS]
+                .iter()
+                .zip(NOISE_BAND_EDGES[1..].iter())
+                .enumerate()
+                .map(|v| (v.0, *((v.1).0), *((v.1).1)))
+                .collect();
             for _f in 0..header.fra as usize {
+                let mut band_amp_sum = [0f64; NOISE_BANDS];
+
                 //skip frame time
                 file.seek(SeekFrom::Current(std::mem::size_of::<f64>() as i64))?;
 
                 let mut frame_peaks = Vec::new();
 
-                for _p in 0..header.par as usize {
+                for p in 0..header.par as usize {
                     let mut amp_freq = [0f64; 2];
                     file.read_f64_into::<LittleEndian>(&mut amp_freq)?;
                     let mut peak = Peak {
                         amp: amp_freq[0],
                         freq: amp_freq[1],
+                        noise_energy: None,
                         phase: None,
                     };
+
+                    //find noise band
+                    let band = bands
+                        .iter()
+                        .find(|&b| b.1 <= peak.freq && peak.freq < b.2)
+                        .unwrap_or(&(NOISE_BANDS - 1, 0f64, 0f64))
+                        .0;
+                    partialband[p] = band;
+                    band_amp_sum[band] += peak.amp;
+
                     match file_type {
                         AtsFileType::AmpFreqPhase | AtsFileType::AmpFreqPhaseNoise => {
                             peak.phase = Some(file.read_f64::<LittleEndian>()?)
@@ -334,6 +361,19 @@ impl AtsFile {
                     AtsFileType::AmpFreqNoise | AtsFileType::AmpFreqPhaseNoise => {
                         let mut nframe = [0f64; 25];
                         file.read_f64_into::<LittleEndian>(&mut nframe)?;
+
+                        //compute energy per parital
+                        for (p, b) in frame_peaks.iter_mut().zip(partialband.iter()) {
+                            let s = band_amp_sum[*b];
+                            let e = nframe[*b];
+                            p.noise_energy = Some(if s > 0f64 {
+                                energy_rms(p.amp * e / s, header.ws)
+                            } else {
+                                0f64
+                            });
+                        }
+
+                        //store
                         noise.push(nframe);
                     }
                     _ => (),
@@ -355,6 +395,7 @@ impl AtsFile {
 struct Peak {
     amp: f64,
     freq: f64,
+    noise_energy: Option<f64>,
     phase: Option<f64>,
 }
 
@@ -398,10 +439,10 @@ external! {
 
         fn send_tracks(&self, f: &AtsFile) {
             //data is in frames, each frame has the same number of tracks
-            //we output track index, frame index, freq, amp
+            //we output track index, frame index, freq, amp, noise_energy
             for (i, frame) in f.frames.iter().enumerate() {
                 for (j, track) in frame.iter().enumerate() {
-                    self.outlet.send_anything(*PLOT_TRACK, &[j.into(), i.into(), track.freq.into(), track.amp.into()]);
+                    self.outlet.send_anything(*PLOT_TRACK, &[j.into(), i.into(), track.freq.into(), track.amp.into(), track.noise_energy.unwrap_or(0f64).into()]);
                 }
             }
         }
