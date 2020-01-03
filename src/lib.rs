@@ -400,7 +400,7 @@ struct Peak {
 }
 
 external! {
-    pub struct AtsDump {
+    pub struct AtsData {
         current: Option<AtsFile>,
         outlet: Box<dyn OutletSend>,
         clock: Clock,
@@ -410,10 +410,10 @@ external! {
         file_recv: Receiver<Result<(AtsFile, String), String>>,
     }
 
-    impl ControlExternal for AtsDump {
+    impl ControlExternal for AtsData {
         fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
             let outlet = builder.new_message_outlet(OutletType::AnyThing);
-            let clock = Clock::new(builder.obj(), atsdump_poll_done_trampoline);
+            let clock = Clock::new(builder.obj(), atsdata_poll_done_trampoline);
             let (file_send, file_recv) = channel();
             let post = builder.poster();
             Self {
@@ -428,7 +428,7 @@ external! {
         }
     }
 
-    impl AtsDump {
+    impl AtsData {
         fn send_noise_bands(&self) {
             for i in 0..NOISE_BANDS {
                 let x0 = NOISE_BAND_EDGES[i];
