@@ -1,4 +1,4 @@
-extend = "../../puredata/utils/Makefile.toml"
+extend = "pd-rust/utils/Makefile.toml"
 
 [tasks.copy]
 dependencies = ["move"]
