@@ -1,4 +1,4 @@
-#N canvas 2 74 821 970 10;
+#N canvas 2 74 961 966 10;
 #X declare -path .;
 #X obj 429 40 declare -path .;
 #X obj 113 259 atsdump;
@@ -22,7 +22,7 @@
 #X obj 383 388 * 1000;
 #X obj 84 652 pack 0 f f;
 #X obj 229 618 hsl 200 15 0 1 0 0 empty empty empty -2 -8 0 10 -262144
--1 -1 4700 1;
+-1 -1 1100 1;
 #X obj 226 658 *;
 #X msg 226 680 \$1 30;
 #X obj 94 908 dac~;
@@ -42,7 +42,7 @@
 #X obj 118 574 r \$0-frames;
 #X obj 156 597 r \$0-durms;
 #X obj 77 487 hradio 15 1 0 9 empty empty empty 0 -8 0 10 -262144 -1
--1 4;
+-1 6;
 #X obj 141 628 * 1;
 #X obj 77 507 - 4;
 #X obj 77 553 + 1;
@@ -51,37 +51,43 @@
 #X floatatom 45 593 5 0 0 0 - - -;
 #X msg 453 668 all freq_mul \$1;
 #X obj 456 647 hsl 128 15 0.1 2 0 0 empty empty empty -2 -8 0 10 -262144
--1 -1 6016 1;
+-1 -1 1516 1;
 #X msg 453 620 1;
-#X obj 456 819 hsl 128 15 0.001 1 1 0 empty empty empty -2 -8 0 10
--262144 -1 -1 0 1;
+#X obj 456 819 hsl 128 15 0 1 0 0 empty empty empty -2 -8 0 10 -262144
+-1 -1 500 1;
 #X msg 453 792 1;
-#X msg 453 840 all amp_mul \$1;
 #X obj 603 640 hsl 128 15 -100 100 0 0 empty empty empty -2 -8 0 10
--262144 -1 -1 6350 1;
+-262144 -1 -1 10050 1;
 #X msg 600 661 all freq_add \$1;
 #X msg 600 613 0;
 #X msg 259 728 vis 39 1;
-#X obj 613 816 hsl 128 15 0.001 1 0 0 empty empty empty -2 -8 0 10
--262144 -1 -1 1259 1;
-#X msg 610 837 all bw_scale \$1;
-#X msg 610 789 0.1;
+#X obj 756 641 hsl 128 15 0.001 1 0 0 empty empty empty -2 -8 0 10
+-262144 -1 -1 200 1;
+#X msg 753 662 all bw_scale \$1;
+#X msg 753 614 0.1;
 #X msg 484 792 0;
-#X obj 453 562 loadbang;
+#X obj 622 535 loadbang;
 #X obj 453 734 loadbang;
 #X obj 113 442 s \$0-synth;
 #X obj 191 728 r \$0-synth;
 #X obj 453 695 s \$0-synth;
 #X obj 600 688 s \$0-synth;
-#X obj 610 864 s \$0-synth;
+#X obj 753 689 s \$0-synth;
 #X obj 453 867 s \$0-synth;
+#X obj 603 817 hsl 128 15 0 10 0 0 empty empty empty -2 -8 0 10 -262144
+-1 -1 10370 1;
+#X msg 600 790 1;
+#X msg 631 790 0;
+#X obj 600 865 s \$0-synth;
+#X msg 600 838 all noise_amp \$1;
+#X msg 453 840 all sine_amp \$1;
 #X connect 1 0 6 0;
 #X connect 2 0 3 0;
 #X connect 3 0 28 0;
 #X connect 4 0 2 0;
 #X connect 5 0 6 1;
 #X connect 6 0 13 0;
-#X connect 7 0 59 0;
+#X connect 7 0 58 0;
 #X connect 10 0 5 0;
 #X connect 11 0 12 0;
 #X connect 12 0 22 0;
@@ -119,22 +125,27 @@
 #X connect 40 0 39 0;
 #X connect 41 0 18 0;
 #X connect 41 1 37 0;
-#X connect 43 0 61 0;
+#X connect 43 0 60 0;
 #X connect 44 0 43 0;
 #X connect 45 0 44 0;
-#X connect 46 0 48 0;
+#X connect 46 0 69 0;
 #X connect 47 0 46 0;
-#X connect 48 0 64 0;
-#X connect 49 0 50 0;
-#X connect 50 0 62 0;
-#X connect 51 0 49 0;
-#X connect 52 0 12 1;
-#X connect 53 0 54 0;
-#X connect 54 0 63 0;
-#X connect 55 0 53 0;
-#X connect 56 0 46 0;
-#X connect 57 0 45 0;
-#X connect 57 0 51 0;
-#X connect 58 0 47 0;
-#X connect 58 0 55 0;
-#X connect 60 0 12 1;
+#X connect 48 0 49 0;
+#X connect 49 0 61 0;
+#X connect 50 0 48 0;
+#X connect 51 0 12 1;
+#X connect 52 0 53 0;
+#X connect 53 0 62 0;
+#X connect 54 0 52 0;
+#X connect 55 0 46 0;
+#X connect 56 0 45 0;
+#X connect 56 0 50 0;
+#X connect 56 0 54 0;
+#X connect 57 0 47 0;
+#X connect 57 0 65 0;
+#X connect 59 0 12 1;
+#X connect 64 0 68 0;
+#X connect 65 0 64 0;
+#X connect 66 0 64 0;
+#X connect 68 0 67 0;
+#X connect 69 0 63 0;
