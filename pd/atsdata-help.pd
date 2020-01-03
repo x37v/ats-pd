@@ -1,4 +1,4 @@
-#N canvas 957 74 961 966 10;
+#N canvas 957 112 961 966 10;
 #X declare -path .;
 #X obj 429 40 declare -path .;
 #X obj 46 58 openpanel;
@@ -7,7 +7,7 @@
 -1;
 #X obj 170 258 pointer;
 #X obj 113 282 ats-struct;
-#X msg 113 414 all pointer \$1;
+#X msg 113 433 all pointer \$1;
 #X msg 182 197 \; pd-ats-data clear;
 #N canvas 2 74 1687 1025 ats-data 0;
 #X restore 430 15 pd ats-data;
@@ -67,7 +67,7 @@
 #X msg 484 792 0;
 #X obj 622 535 loadbang;
 #X obj 453 734 loadbang;
-#X obj 113 442 s \$0-synth;
+#X obj 113 458 s \$0-synth;
 #X obj 191 728 r \$0-synth;
 #X obj 453 695 s \$0-synth;
 #X obj 600 688 s \$0-synth;
@@ -81,6 +81,9 @@
 #X msg 600 838 all noise_amp \$1;
 #X msg 453 840 all sine_amp \$1;
 #X obj 113 259 atsdata;
+#X obj 113 410 pointer;
+#X obj 89 382 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
+-1;
 #X connect 1 0 2 0;
 #X connect 2 0 27 0;
 #X connect 3 0 1 0;
@@ -91,7 +94,7 @@
 #X connect 10 0 11 0;
 #X connect 11 0 21 0;
 #X connect 11 0 21 1;
-#X connect 12 0 6 0;
+#X connect 12 0 70 0;
 #X connect 12 1 13 0;
 #X connect 13 0 15 0;
 #X connect 13 1 14 0;
@@ -149,3 +152,5 @@
 #X connect 67 0 66 0;
 #X connect 68 0 62 0;
 #X connect 69 0 5 0;
+#X connect 70 0 6 0;
+#X connect 71 0 70 0;
