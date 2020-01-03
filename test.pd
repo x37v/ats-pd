@@ -14,7 +14,7 @@
 #X restore 430 15 pd ats-data;
 #X msg 170 233 traverse pd-ats-data \, bang;
 #X obj 114 722 vline~;
-#X obj 104 784 clone ats-sin 100;
+#X obj 104 784 clone ats-sin-noi 100;
 #X obj 113 314 t p p;
 #X obj 140 343 get ats-data-template frame_count dur_sec;
 #X floatatom 383 366 5 0 0 0 - - -;
@@ -22,7 +22,7 @@
 #X obj 383 388 * 1000;
 #X obj 84 652 pack 0 f f;
 #X obj 229 618 hsl 200 15 0 1 0 0 empty empty empty -2 -8 0 10 -262144
--1 -1 200 1;
+-1 -1 4700 1;
 #X obj 226 658 *;
 #X msg 226 680 \$1 30;
 #X obj 94 908 dac~;
@@ -51,26 +51,26 @@
 #X floatatom 45 593 5 0 0 0 - - -;
 #X msg 453 668 all freq_mul \$1;
 #X obj 456 647 hsl 128 15 0.1 2 0 0 empty empty empty -2 -8 0 10 -262144
--1 -1 2616 1;
+-1 -1 6016 1;
 #X msg 453 620 1;
 #X obj 456 819 hsl 128 15 0.001 1 1 0 empty empty empty -2 -8 0 10
 -262144 -1 -1 0 1;
 #X msg 453 792 1;
 #X msg 453 840 all amp_mul \$1;
 #X obj 603 640 hsl 128 15 -100 100 0 0 empty empty empty -2 -8 0 10
--262144 -1 -1 6550 1;
+-262144 -1 -1 6350 1;
 #X msg 600 661 all freq_add \$1;
 #X msg 600 613 0;
-#X msg 216 722 vis 39 1;
+#X msg 259 728 vis 39 1;
 #X obj 613 816 hsl 128 15 0.001 1 0 0 empty empty empty -2 -8 0 10
--262144 -1 -1 559 1;
+-262144 -1 -1 1259 1;
 #X msg 610 837 all bw_scale \$1;
 #X msg 610 789 0.1;
 #X msg 484 792 0;
 #X obj 453 562 loadbang;
 #X obj 453 734 loadbang;
 #X obj 113 442 s \$0-synth;
-#X obj 203 760 r \$0-synth;
+#X obj 191 728 r \$0-synth;
 #X obj 453 695 s \$0-synth;
 #X obj 600 688 s \$0-synth;
 #X obj 610 864 s \$0-synth;
