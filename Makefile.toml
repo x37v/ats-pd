@@ -1,1 +1,20 @@
 extend = "../../puredata/utils/Makefile.toml"
+
+[tasks.copy]
+dependencies = ["move"]
+script = ['rsync pd/* ${CARGO_MAKE_CRATE_FS_NAME}/']
+
+[tasks.run.linux]
+clear = true
+dependencies = ["copy"]
+command = "pd"
+args = ["${CARGO_MAKE_CRATE_FS_NAME}/atsdata-help.pd"]
+
+[tasks.run.mac]
+clear = true
+dependencies = ["copy"]
+command = "open"
+args = ["${CARGO_MAKE_CRATE_FS_NAME}/atsdata-help.pd"]
+
+[tasks.package]
+dependencies = ["move", "copy"]
