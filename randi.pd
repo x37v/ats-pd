@@ -1,0 +1,53 @@
+#N canvas 651 274 613 771 12;
+#X obj 243 249 samphold~;
+#X obj 249 221 noise~;
+#X obj 175 298 samphold~;
+#X obj 92 108 metro 100;
+#X obj 92 20 tgl 15 0 empty empty empty 17 7 0 10 -262144 -1 -1 0 1
+;
+#X obj 188 351 snapshot~;
+#X floatatom 188 374 5 0 0 0 - - -;
+#X obj 298 381 snapshot~;
+#X obj 125 503 snapshot~;
+#X obj 179 132 fexpr~ $x1[-1] \; $x1[-1] \; $x1[-2];
+#X obj 179 109 phasor~ 1;
+#X obj 219 538 hsl 128 15 -1 1 0 0 empty empty empty -2 -8 0 10 -262144
+-1 -1 3189 1;
+#X obj 219 517 hsl 128 15 -1 1 0 0 empty empty empty -2 -8 0 10 -262144
+-1 -1 9641 1;
+#X obj 219 558 hsl 128 15 -1 1 0 0 empty empty empty -2 -8 0 10 -262144
+-1 -1 910 1;
+#X obj 74 557 outlet~;
+#X obj 180 16 inlet~;
+#X obj 74 399 expr~ $v2 + ($v3 - $v2) * $v1;
+#X text 21 19 visualize;
+#X text 212 78 offset for visualization with no connection;
+#X obj 92 133 send \$0-v;
+#X obj 298 351 r \$0-v;
+#X obj 125 476 r \$0-v;
+#X obj 202 325 r \$0-v;
+#X obj 179 78 +~ 0;
+#X connect 0 0 2 0;
+#X connect 0 0 7 0;
+#X connect 0 0 16 2;
+#X connect 1 0 0 0;
+#X connect 2 0 5 0;
+#X connect 2 0 16 1;
+#X connect 3 0 19 0;
+#X connect 4 0 3 0;
+#X connect 4 0 23 1;
+#X connect 5 0 6 0;
+#X connect 6 0 12 0;
+#X connect 7 0 13 0;
+#X connect 8 0 11 0;
+#X connect 9 0 16 0;
+#X connect 9 1 2 1;
+#X connect 9 2 0 1;
+#X connect 10 0 9 0;
+#X connect 15 0 23 0;
+#X connect 16 0 8 0;
+#X connect 16 0 14 0;
+#X connect 20 0 7 0;
+#X connect 21 0 8 0;
+#X connect 22 0 5 0;
+#X connect 23 0 10 0;
