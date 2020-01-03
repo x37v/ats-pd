@@ -1,4 +1,6 @@
-# Analysis, Transformation and Synthesis (ATS) in Pure Data
+# atsdata
+
+Analysis, Transformation and Synthesis (ATS) in Pure Data.
 
 This project is a new approach for using ATS in [Pure Data (aka PD)](https://puredata.info/).
 
