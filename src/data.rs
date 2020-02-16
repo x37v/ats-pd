@@ -30,6 +30,7 @@ pub struct AtsData {
     pub frames: Box<[Box<[Peak]>]>,
     pub noise: Option<Box<[[f64; NOISE_BANDS]]>>,
     pub file_type: AtsDataType,
+    pub source: String,
 }
 
 fn energy_rms(value: f64, window_size: f64) -> f64 {
@@ -39,6 +40,7 @@ fn energy_rms(value: f64, window_size: f64) -> f64 {
 impl AtsData {
     pub fn try_read<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
         let mut header: std::mem::MaybeUninit<ATS_HEADER> = std::mem::MaybeUninit::uninit();
+        let source = path.as_ref().to_string_lossy().into_owned();
         let mut file = File::open(path)?;
         unsafe {
             let s = slice::from_raw_parts_mut(
@@ -148,6 +150,7 @@ impl AtsData {
                 frames: frames.into_boxed_slice(),
                 noise,
                 file_type,
+                source,
             })
         }
     }
