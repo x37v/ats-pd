@@ -45,18 +45,18 @@ static NOISE_BAND_EDGES: &[f64; NOISE_BANDS + 1] = &[
     15500.0, 20000.0,
 ];
 
-enum AtsFileType {
+enum AtsDataType {
     AmpFreq = 1,
     AmpFreqPhase = 2,
     AmpFreqNoise = 3,
     AmpFreqPhaseNoise = 4,
 }
 
-struct AtsFile {
+struct AtsData {
     pub header: ATS_HEADER,
     pub frames: Vec<Vec<Peak>>,
     pub noise: Option<Vec<[f64; NOISE_BANDS]>>,
-    pub file_type: AtsFileType,
+    pub file_type: AtsDataType,
 }
 
 fn stringify<E: std::fmt::Display>(x: E) -> String {
@@ -279,7 +279,7 @@ fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), S
     }
 }
 
-impl AtsFile {
+impl AtsData {
     pub fn try_read<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
         let mut header: std::mem::MaybeUninit<ATS_HEADER> = std::mem::MaybeUninit::uninit();
         let mut file = File::open(path)?;
@@ -298,10 +298,10 @@ impl AtsFile {
                 ));
             }
             let file_type = match header.typ as usize {
-                1 => AtsFileType::AmpFreq,
-                2 => AtsFileType::AmpFreqPhase,
-                3 => AtsFileType::AmpFreqNoise,
-                4 => AtsFileType::AmpFreqPhaseNoise,
+                1 => AtsDataType::AmpFreq,
+                2 => AtsDataType::AmpFreqPhase,
+                3 => AtsDataType::AmpFreqNoise,
+                4 => AtsDataType::AmpFreqPhaseNoise,
                 _ => {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
@@ -350,7 +350,7 @@ impl AtsFile {
                     band_amp_sum[band] += peak.amp;
 
                     match file_type {
-                        AtsFileType::AmpFreqPhase | AtsFileType::AmpFreqPhaseNoise => {
+                        AtsDataType::AmpFreqPhase | AtsDataType::AmpFreqPhaseNoise => {
                             peak.phase = Some(file.read_f64::<LittleEndian>()?)
                         }
                         _ => (),
@@ -358,7 +358,7 @@ impl AtsFile {
                     frame_peaks.push(peak);
                 }
                 match file_type {
-                    AtsFileType::AmpFreqNoise | AtsFileType::AmpFreqPhaseNoise => {
+                    AtsDataType::AmpFreqNoise | AtsDataType::AmpFreqPhaseNoise => {
                         let mut nframe = [0f64; 25];
                         file.read_f64_into::<LittleEndian>(&mut nframe)?;
 
@@ -401,20 +401,20 @@ struct Peak {
 
 external! {
     #[name="ats/data"]
-    pub struct AtsData {
-        current: Option<AtsFile>,
+    pub struct AtsDataExternal {
+        current: Option<AtsData>,
         outlet: Box<dyn OutletSend>,
         clock: Clock,
         post: Box<dyn PdPost>,
         waiting: AtomicUsize,
-        file_send: Sender<Result<(AtsFile, String), String>>,
-        file_recv: Receiver<Result<(AtsFile, String), String>>,
+        file_send: Sender<Result<(AtsData, String), String>>,
+        file_recv: Receiver<Result<(AtsData, String), String>>,
     }
 
-    impl ControlExternal for AtsData {
+    impl ControlExternal for AtsDataExternal {
         fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
             let outlet = builder.new_message_outlet(OutletType::AnyThing);
-            let clock = Clock::new(builder.obj(), atsdata_poll_done_trampoline);
+            let clock = Clock::new(builder.obj(), atsdataexternal_poll_done_trampoline);
             let (file_send, file_recv) = channel();
             let post = builder.poster();
             Self {
@@ -429,7 +429,7 @@ external! {
         }
     }
 
-    impl AtsData {
+    impl AtsDataExternal {
         fn send_noise_bands(&self) {
             for i in 0..NOISE_BANDS {
                 let x0 = NOISE_BAND_EDGES[i];
@@ -438,7 +438,7 @@ external! {
             }
         }
 
-        fn send_tracks(&self, f: &AtsFile) {
+        fn send_tracks(&self, f: &AtsData) {
             //data is in frames, each frame has the same number of tracks
             //we output track index, frame index, freq, amp, noise_energy
             for (i, frame) in f.frames.iter().enumerate() {
@@ -448,7 +448,7 @@ external! {
             }
         }
 
-        fn send_noise(&self, f: &AtsFile) {
+        fn send_noise(&self, f: &AtsData) {
             if let Some(n) = &f.noise {
                 for (i, frame) in n.iter().enumerate() {
                     for (j, energy) in frame.iter().enumerate() {
@@ -458,7 +458,7 @@ external! {
             }
         }
 
-        fn send_file_info(&self, f: &AtsFile) {
+        fn send_file_info(&self, f: &AtsData) {
             self.outlet.send_anything(*FILE_TYPE, &[f.header.typ.into()]);
             self.outlet.send_anything(*SAMPLE_RATE, &[f.header.sr.into()]);
             self.outlet.send_anything(*DUR_SECONDS, &[f.header.dur.into()]);
@@ -488,7 +488,7 @@ external! {
 
         #[sel]
         pub fn open(&mut self, filename: Symbol) {
-            self.queue_job(move || AtsFile::try_read(filename).map_err(stringify).map(|r| (r, filename.into())))
+            self.queue_job(move || AtsData::try_read(filename).map_err(stringify).map(|r| (r, filename.into())))
         }
 
         #[sel]
@@ -534,7 +534,7 @@ external! {
                                             let _ = CString::from_raw(outfile);
                                             let _ = CString::from_raw(resfile);
                                             match v {
-                                                0 => AtsFile::try_read(outpath).map_err(stringify).map(|r| (r, f)),
+                                                0 => AtsData::try_read(outpath).map_err(stringify).map(|r| (r, f)),
                                                 e @ _ => Err(format!("failed to analyize file: {} with error num: {}", f, e))
                                             }
                                         }
@@ -554,7 +554,7 @@ external! {
             }
         }
 
-        fn queue_job<F: 'static + Send + FnOnce() -> Result<(AtsFile, String), String>>(&mut self, job: F) {
+        fn queue_job<F: 'static + Send + FnOnce() -> Result<(AtsData, String), String>>(&mut self, job: F) {
             let s = self.file_send.clone();
             self.waiting.fetch_add(1, Ordering::SeqCst);
             std::thread::spawn(move || s.send(job()));
