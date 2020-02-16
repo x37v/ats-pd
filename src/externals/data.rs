@@ -195,7 +195,7 @@ lazy_static::lazy_static! {
     static ref DUR_SECONDS: Symbol = "dur_sec".try_into().unwrap();
     static ref FILE_TYPE: Symbol = "file_type".try_into().unwrap();
 
-    static ref DATA_KEY: Symbol = "key".try_into().unwrap();
+    static ref DATA_KEY: Symbol = "ats_data".try_into().unwrap();
     static ref ANAL_MUTEX: Mutex<()> = Mutex::new(());
 }
 
