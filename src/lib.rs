@@ -1,4 +1,5 @@
 mod data;
+mod externals;
 
 extern "C" {
     fn atsdataexternal_setup();
