@@ -54,8 +54,8 @@ enum AtsDataType {
 
 struct AtsData {
     pub header: ATS_HEADER,
-    pub frames: Vec<Vec<Peak>>,
-    pub noise: Option<Vec<[f64; NOISE_BANDS]>>,
+    pub frames: Box<[Box<[Peak]>]>,
+    pub noise: Option<Box<[[f64; NOISE_BANDS]]>>,
     pub file_type: AtsDataType,
 }
 
@@ -378,13 +378,17 @@ impl AtsData {
                     }
                     _ => (),
                 }
-                frames.push(frame_peaks);
+                frames.push(frame_peaks.into_boxed_slice());
             }
 
-            let noise = if noise.len() != 0 { Some(noise) } else { None };
+            let noise = if noise.len() != 0 {
+                Some(noise.into_boxed_slice())
+            } else {
+                None
+            };
             Ok(Self {
                 header,
-                frames,
+                frames: frames.into_boxed_slice(),
                 noise,
                 file_type,
             })
