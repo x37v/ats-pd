@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use crate::data::AtsData;
 
@@ -102,7 +103,8 @@ external! {
                                 Err(format!("file does not exist: {}", f))
                             } else {
                                 if let Ok(dir) = tempfile::tempdir() {
-                                    let outpath = dir.path().join("out.ats");
+                                    //create temp path, based on original file name if possible
+                                    let outpath = dir.path().join(format!("{}.ats", Path::new(&f).file_stem().unwrap_or(std::ffi::OsStr::new("out")).to_string_lossy()));
                                     let infile = CString::new(f.clone()).unwrap().into_raw();
                                     let outfile = to_cstring(outpath.clone());
                                     //ATS seems to always want the residual file in the same place
@@ -117,7 +119,12 @@ external! {
                                         let outfile = outfile.unwrap().into_raw();
                                         let resfile = resfile.unwrap().into_raw();
                                         unsafe {
-                                            let v = ats_sys::main_anal(infile, outfile, &mut args, resfile);
+                                            let v = {
+                                                //all analysis uses the same residual file so we
+                                                //must lock
+                                                let _ = ANAL_MUTEX.lock().unwrap();
+                                                ats_sys::main_anal(infile, outfile, &mut args, resfile)
+                                            };
                                             //cleanup constructed cstring
                                             let _ = CString::from_raw(infile);
                                             let _ = CString::from_raw(outfile);
@@ -189,6 +196,7 @@ lazy_static::lazy_static! {
     static ref FILE_TYPE: Symbol = "file_type".try_into().unwrap();
 
     static ref DATA_KEY: Symbol = "key".try_into().unwrap();
+    static ref ANAL_MUTEX: Mutex<()> = Mutex::new(());
 }
 
 fn create_app(cmd_name: &str) -> App {
