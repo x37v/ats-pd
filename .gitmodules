@@ -1,3 +1,0 @@
-[submodule "pd-rust"]
-	path = pd-rust
-	url = https://github.com/x37v/puredata-rust.git
