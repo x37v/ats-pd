@@ -400,6 +400,7 @@ struct Peak {
 }
 
 external! {
+    #[name="ats/data"]
     pub struct AtsData {
         current: Option<AtsFile>,
         outlet: Box<dyn OutletSend>,
