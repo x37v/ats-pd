@@ -16,8 +16,6 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
 use crate::data::AtsData;
-use crate::data::NOISE_BANDS;
-use crate::data::NOISE_BAND_EDGES;
 
 external! {
     #[name="ats/data"]
