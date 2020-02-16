@@ -1,5 +1,5 @@
 /target
-/atsdata
+/ats
 .gdb_history
 **/*.rs.bk
 *.pd_*

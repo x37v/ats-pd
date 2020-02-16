@@ -1,11 +1,11 @@
 [package]
-name = "atsdata"
+name = "ats"
 version = "0.1.0"
 authors = ["Alex Norman <alex@x37v.info>"]
 edition = "2018"
 
 [lib]
-name = "atsdata"
+name = "ats"
 crate-type = ["cdylib"]
 
 [dependencies]
