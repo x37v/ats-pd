@@ -13,6 +13,7 @@ use std::os::raw::c_int;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 
 use crate::data::AtsData;
 use crate::data::NOISE_BANDS;
@@ -21,7 +22,7 @@ use crate::data::NOISE_BAND_EDGES;
 external! {
     #[name="ats/data"]
     pub struct AtsDataExternal {
-        current: Option<AtsData>,
+        current: Option<Arc<AtsData>>,
         outlet: Box<dyn OutletSend>,
         clock: Clock,
         post: Box<dyn PdPost>,
@@ -49,34 +50,6 @@ external! {
     }
 
     impl AtsDataExternal {
-        fn send_noise_bands(&self) {
-            for i in 0..NOISE_BANDS {
-                let x0 = NOISE_BAND_EDGES[i];
-                let x1 = NOISE_BAND_EDGES[i + 1];
-                self.outlet.send_anything(*PLOT_INFO_BANDS, &[i.into(), x0.into(), x1.into()]);
-            }
-        }
-
-        fn send_tracks(&self, f: &AtsData) {
-            //data is in frames, each frame has the same number of tracks
-            //we output track index, frame index, freq, amp, noise_energy
-            for (i, frame) in f.frames.iter().enumerate() {
-                for (j, track) in frame.iter().enumerate() {
-                    self.outlet.send_anything(*PLOT_TRACK, &[j.into(), i.into(), track.freq.into(), track.amp.into(), track.noise_energy.unwrap_or(0f64).into()]);
-                }
-            }
-        }
-
-        fn send_noise(&self, f: &AtsData) {
-            if let Some(n) = &f.noise {
-                for (i, frame) in n.iter().enumerate() {
-                    for (j, energy) in frame.iter().enumerate() {
-                        self.outlet.send_anything(*PLOT_NOISE, &[j.into(), i.into(), (*energy).into()]);
-                    }
-                }
-            }
-        }
-
         fn send_file_info(&self, f: &AtsData) {
             self.outlet.send_anything(*FILE_TYPE, &[f.header.typ.into()]);
             self.outlet.send_anything(*SAMPLE_RATE, &[f.header.sr.into()]);
@@ -91,18 +64,11 @@ external! {
 
         #[bang]
         pub fn bang(&mut self) {
-            self.outlet.send_anything(*DUMPING, &[1.into()]);
             if let Some(f) = &self.current {
-                self.send_noise_bands();
                 self.send_file_info(f);
-                self.outlet.send_anything(*PLOT_INFO_TRACKS, &[f.header.par.into(), f.header.fra.into()]);
-                self.send_tracks(f);
-                self.send_noise(f);
             } else {
                 self.outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
-                self.outlet.send_anything(*PLOT_INFO_TRACKS, &[0f32.into(), 0f32.into()]);
             }
-            self.outlet.send_anything(*DUMPING, &[0.into()]);
         }
 
         #[sel]
@@ -188,7 +154,7 @@ external! {
                 self.current = match res {
                     Ok((f, filename)) => {
                         self.post.post(format!("read {}", filename));
-                        Some(f)
+                        Some(Arc::new(f))
                     },
                     Err(err) => {
                         self.post.post_error(err);
@@ -214,14 +180,6 @@ lazy_static::lazy_static! {
     static ref FREQ_MAX: Symbol = "freq_max".try_into().unwrap();
     static ref DUR_SECONDS: Symbol = "dur_sec".try_into().unwrap();
     static ref FILE_TYPE: Symbol = "file_type".try_into().unwrap();
-
-    static ref PLOT_INFO_TRACKS: Symbol = "track_count".try_into().unwrap();
-    static ref PLOT_INFO_BANDS: Symbol = "noise_band".try_into().unwrap();
-
-    static ref PLOT_TRACK: Symbol = "track_point".try_into().unwrap();
-    static ref PLOT_NOISE: Symbol = "noise_point".try_into().unwrap();
-    //indicate if we're actively dumping
-    static ref DUMPING: Symbol = "dumping".try_into().unwrap();
 }
 
 fn create_app(cmd_name: &str) -> App {
@@ -238,42 +196,42 @@ fn create_app(cmd_name: &str) -> App {
             .required(true)
             .help("the thing you want to analyize")
         )
-        //"\t -e duration (%f seconds or end)\n"         \
+        //"\t -e duration (%f seconds or end)\n"
         .arg(Arg::with_name("duration")
             .short("e")
             .long("duration")
             .takes_value(true)
             .help("float seconds, defaults to the whole soundfile")
         )
-        //"\t -l lowest frequency (%f Hertz)\n"          \
+        //"\t -l lowest frequency (%f Hertz)\n"
         .arg(Arg::with_name("lowest_frequency")
             .short("l")
             .long("lowest_freq")
             .takes_value(true)
             .help("float Hertz")
         )
-        //"\t -H highest frequency (%f Hertz)\n"         \
+        //"\t -H highest frequency (%f Hertz)\n"
         .arg(Arg::with_name("highest_frequency")
             .short("H")
             .long("highest_freq")
             .takes_value(true)
             .help("float Hertz")
         )
-        //"\t -d frequency deviation (%f of partial freq.)\n"    \
+        //"\t -d frequency deviation (%f of partial freq.)\n"
         .arg(Arg::with_name("frequency_deviation")
             .short("d")
             .long("freq_dev")
             .takes_value(true)
             .help("float of partial freq")
         )
-        //"\t -c window cycles (%d cycles)\n"                           \
+        //"\t -c window cycles (%d cycles)\n"
         .arg(Arg::with_name("window_cycles")
             .short("c")
             .long("window_cycles")
             .takes_value(true)
             .help("int number of cycles")
         )
-        //"\t -w window type (type: %d)\n"                              \
+        //"\t -w window type (type: %d)\n"
         .arg(Arg::with_name("window_type")
             .short("w")
             .long("window_type")
@@ -281,70 +239,70 @@ fn create_app(cmd_name: &str) -> App {
             .possible_values(&["0","1","2","3"])
             .help("0=BLACKMAN, 1=BLACKMAN_H, 2=HAMMING, 3=VONHANN")
         )
-        //"\t -h hop size (%f of window size)\n"                        \
+        //"\t -h hop size (%f of window size)\n"
         .arg(Arg::with_name("hop_size")
             .short("h")
             .long("hop_size")
             .takes_value(true)
             .help("float, portion of window size")
         )
-        //"\t -m lowest magnitude (%f)\n"                               \
+        //"\t -m lowest magnitude (%f)\n"
         .arg(Arg::with_name("lowest_magnitude")
             .short("m")
             .long("lowest_mag")
             .takes_value(true)
             .help("float")
         )
-        //"\t -t track length (%d frames)\n"                            \
+        //"\t -t track length (%d frames)\n"
         .arg(Arg::with_name("track_length")
             .short("t")
             .long("track_len")
             .takes_value(true)
             .help("int frames")
         )
-        //"\t -s min. segment length (%d frames)\n"                     \
+        //"\t -s min. segment length (%d frames)\n"
         .arg(Arg::with_name("min_segment_length")
             .short("s")
             .long("min_seg_len")
             .takes_value(true)
             .help("int frames")
         )
-        //"\t -g min. gap length (%d frames)\n"                         \
+        //"\t -g min. gap length (%d frames)\n"
         .arg(Arg::with_name("min_gap_length")
             .short("g")
             .long("min_gap_len")
             .takes_value(true)
             .help("int frames")
         )
-        //"\t -T SMR threshold (%f dB SPL)\n"                           \
+        //"\t -T SMR threshold (%f dB SPL)\n"
         .arg(Arg::with_name("smr_threshold")
             .short("T")
             .long("smr_thresh")
             .takes_value(true)
             .help("float dB SPL")
         )
-        //"\t -S min. segment SMR (%f dB SPL)\n"                        \
+        //"\t -S min. segment SMR (%f dB SPL)\n"
         .arg(Arg::with_name("min_segment_smr")
             .short("S")
             .long("min_seg_smr")
             .takes_value(true)
             .help("float dB SPL")
         )
-        //"\t -P last peak contribution (%f of last peak's parameters)\n" \
+        //"\t -P last peak contribution (%f of last peak's parameters)\n"
         .arg(Arg::with_name("last_peak_contribution")
             .short("P")
             .long("last_peak_cont")
             .takes_value(true)
             .help("float, of last peak's parameters")
         )
-        //"\t -M SMR contribution (%f)\n"                               \
+        //"\t -M SMR contribution (%f)\n"
         .arg(Arg::with_name("smr_contribution")
             .short("M")
             .long("smr_cont")
             .takes_value(true)
             .help("float")
         )
-        //"\t -F File Type (type: %d)\n"                                \
+        //"\t -F File Type (type: %d)\n"
         //"\t\t(Options: 1=amp.and freq. only, 2=amp.,freq. and phase, 3=amp.,freq. and residual, 4=amp.,freq.,phase, and residual)\n\n",
         .arg(Arg::with_name("file_type")
             .short("F")
