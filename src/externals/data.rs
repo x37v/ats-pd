@@ -20,7 +20,7 @@ use crate::data::AtsData;
 external! {
     #[name="ats/data"]
     pub struct AtsDataExternal {
-        current: Option<Arc<AtsData>>,
+        current: Option<(Symbol, Arc<AtsData>)>,
         outlet: Box<dyn OutletSend>,
         clock: Clock,
         post: Box<dyn PdPost>,
@@ -62,8 +62,9 @@ external! {
 
         #[bang]
         pub fn bang(&mut self) {
-            if let Some(f) = &self.current {
+            if let Some((k, f)) = &self.current {
                 self.send_file_info(f);
+                self.outlet.send_anything(*DATA_KEY, &[(*k).into()]);
             } else {
                 self.outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
             }
@@ -104,7 +105,12 @@ external! {
                                     let outpath = dir.path().join("out.ats");
                                     let infile = CString::new(f.clone()).unwrap().into_raw();
                                     let outfile = to_cstring(outpath.clone());
-                                    let resfile = to_cstring(dir.path().join("atsa_res.wav"));
+                                    //ATS seems to always want the residual file in the same place
+                                    //let resfile = to_cstring(dir.path().join("atsa_res.wav"));
+                                    let mut resfile = ats_sys::ATSA_RES_FILE.to_vec();
+                                    resfile.retain(|&x| x != b'\0'); // remove Nul
+                                    let resfile = CString::new(resfile).unwrap();
+                                    let resfile:Result<CString, String> = Ok(resfile);
                                     if outfile.is_err() || resfile.is_err() {
                                         Err("cannot get out or resfile paths".into())
                                     } else {
@@ -152,7 +158,10 @@ external! {
                 self.current = match res {
                     Ok((f, filename)) => {
                         self.post.post(format!("read {}", filename));
-                        Some(Arc::new(f))
+                        //store in cache
+                        let c = Arc::new(f);
+                        let k = crate::cache::insert(c.clone());
+                        Some((k, c))
                     },
                     Err(err) => {
                         self.post.post_error(err);
@@ -178,6 +187,8 @@ lazy_static::lazy_static! {
     static ref FREQ_MAX: Symbol = "freq_max".try_into().unwrap();
     static ref DUR_SECONDS: Symbol = "dur_sec".try_into().unwrap();
     static ref FILE_TYPE: Symbol = "file_type".try_into().unwrap();
+
+    static ref DATA_KEY: Symbol = "key".try_into().unwrap();
 }
 
 fn create_app(cmd_name: &str) -> App {
