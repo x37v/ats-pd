@@ -31,6 +31,7 @@ pub struct AtsData {
     pub noise: Option<Box<[[f64; NOISE_BANDS]]>>,
     pub file_type: AtsDataType,
     pub source: String,
+    partials: usize,
 }
 
 fn energy_rms(value: f64, window_size: f64) -> f64 {
@@ -38,6 +39,14 @@ fn energy_rms(value: f64, window_size: f64) -> f64 {
 }
 
 impl AtsData {
+    pub fn partials(&self) -> usize {
+        self.partials
+    }
+
+    pub fn has_noise(&self) -> bool {
+        self.noise.is_some()
+    }
+
     pub fn try_read<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
         let mut header: std::mem::MaybeUninit<ATS_HEADER> = std::mem::MaybeUninit::uninit();
         let source = path.as_ref().to_string_lossy().into_owned();
@@ -69,6 +78,7 @@ impl AtsData {
                 }
             };
 
+            let partials = header.par as usize;
             let mut frames = Vec::new();
             let mut noise = Vec::new();
             let mut partialband: Vec<usize> = std::iter::repeat(0usize)
@@ -89,7 +99,7 @@ impl AtsData {
 
                 let mut frame_peaks = Vec::new();
 
-                for p in 0..header.par as usize {
+                for p in 0..partials {
                     let mut amp_freq = [0f64; 2];
                     file.read_f64_into::<LittleEndian>(&mut amp_freq)?;
                     let mut peak = Peak {
@@ -151,6 +161,7 @@ impl AtsData {
                 noise,
                 file_type,
                 source,
+                partials,
             })
         }
     }
