@@ -104,7 +104,7 @@ pd_ext_macros::external! {
             builder.new_signal_outlet();
             let (data_send, data_recv) = sync_channel(32);
 
-            let synths = 50;
+            let synths = 50; //TODO get from args
             let synths = (0..synths).map(|_| ParitalSynth::default()).collect();
 
             Self {
