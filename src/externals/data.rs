@@ -22,7 +22,8 @@ external! {
     #[name="ats/data"]
     pub struct AtsDataExternal {
         current: Option<(Symbol, Arc<AtsData>)>,
-        outlet: Box<dyn OutletSend>,
+        data_outlet: Box<dyn OutletSend>,
+        info_outlet: Box<dyn OutletSend>,
         clock: Clock,
         post: Box<dyn PdPost>,
         waiting: AtomicUsize,
@@ -32,12 +33,14 @@ external! {
 
     impl ControlExternal for AtsDataExternal {
         fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
-            let outlet = builder.new_message_outlet(OutletType::AnyThing);
+            let data_outlet = builder.new_message_outlet(OutletType::AnyThing);
+            let info_outlet = builder.new_message_outlet(OutletType::AnyThing);
             let clock = Clock::new(builder.obj(), atsdataexternal_poll_done_trampoline);
             let (file_send, file_recv) = channel();
             let post = builder.poster();
             Self {
-                outlet,
+                data_outlet,
+                info_outlet,
                 current: None,
                 clock,
                 post,
@@ -50,24 +53,25 @@ external! {
 
     impl AtsDataExternal {
         fn send_file_info(&self, f: &AtsData) {
-            self.outlet.send_anything(*FILE_TYPE, &[f.header.typ.into()]);
-            self.outlet.send_anything(*SAMPLE_RATE, &[f.header.sr.into()]);
-            self.outlet.send_anything(*DUR_SECONDS, &[f.header.dur.into()]);
-            self.outlet.send_anything(*FRAME_SIZE, &[f.header.fs.into()]);
-            self.outlet.send_anything(*WINDOW_SIZE, &[f.header.ws.into()]);
-            self.outlet.send_anything(*PARTIAL_COUNT, &[f.header.par.into()]);
-            self.outlet.send_anything(*FRAME_COUNT, &[f.header.fra.into()]);
-            self.outlet.send_anything(*AMP_MAX, &[f.header.ma.into()]);
-            self.outlet.send_anything(*FREQ_MAX, &[f.header.mf.into()]);
+            self.info_outlet.send_anything(*FILE_TYPE, &[f.header.typ.into()]);
+            self.info_outlet.send_anything(*SAMPLE_RATE, &[f.header.sr.into()]);
+            self.info_outlet.send_anything(*DUR_SECONDS, &[f.header.dur.into()]);
+            self.info_outlet.send_anything(*FRAME_SIZE, &[f.header.fs.into()]);
+            self.info_outlet.send_anything(*WINDOW_SIZE, &[f.header.ws.into()]);
+            self.info_outlet.send_anything(*PARTIAL_COUNT, &[f.header.par.into()]);
+            self.info_outlet.send_anything(*FRAME_COUNT, &[f.header.fra.into()]);
+            self.info_outlet.send_anything(*AMP_MAX, &[f.header.ma.into()]);
+            self.info_outlet.send_anything(*FREQ_MAX, &[f.header.mf.into()]);
         }
 
         #[bang]
         pub fn bang(&mut self) {
             if let Some((k, f)) = &self.current {
                 self.send_file_info(f);
-                self.outlet.send_anything(*DATA_KEY, &[(*k).into()]);
+                self.data_outlet.send_anything(*DATA_KEY, &[(*k).into()]);
             } else {
-                self.outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
+                self.info_outlet.send_anything(*FILE_TYPE, &[0f32.into()]);
+                self.data_outlet.send_anything(*DATA_KEY, &[]);
             }
         }
 
