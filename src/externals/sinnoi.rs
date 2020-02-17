@@ -2,7 +2,10 @@ use crate::data::AtsData;
 use itertools::izip;
 use pd_ext::builder::SignalProcessorExternalBuilder;
 use pd_ext::external::SignalProcessorExternal;
+use pd_ext::post::PdPost;
+use pd_ext::symbol::Symbol;
 use rand::prelude::*;
+use std::convert::TryInto;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::Arc;
 
@@ -14,6 +17,15 @@ enum Command {
 
 fn noise() -> f64 {
     thread_rng().gen_range(-1f64, 1f64)
+}
+
+lazy_static::lazy_static! {
+    static ref ALL: Symbol = "all".try_into().unwrap();
+    static ref FREQ_MUL: Symbol = "freq_mul".try_into().unwrap();
+    static ref FREQ_ADD: Symbol = "freq_add".try_into().unwrap();
+    static ref AMP_MUL: Symbol = "amp_mul".try_into().unwrap();
+    static ref NOISE_MUL: Symbol = "noise_mul".try_into().unwrap();
+    static ref NOISE_BW: Symbol = "noise_bw".try_into().unwrap();
 }
 
 pub struct ParitalSynth {
@@ -82,7 +94,8 @@ pd_ext_macros::external! {
         current: Option<Arc<AtsData>>,
         data_send: SyncSender<Command>,
         data_recv: Receiver<Command>,
-        synths: Box<[ParitalSynth]>
+        synths: Box<[ParitalSynth]>,
+        post: Box<dyn PdPost>,
     }
 
     impl AtsSinNoiExternal {
@@ -97,6 +110,36 @@ pd_ext_macros::external! {
         pub fn clear(&mut self) {
             let _ = self.data_send.send(Command::Data(None));
         }
+
+        #[sel]
+        pub fn freq_mul(&mut self, args: &[pd_ext::atom::Atom]) {
+            match self.extract_args(args) {
+                Ok((i, v)) => (),
+                Err(e) => self.post.post_error(e),
+            };
+        }
+
+        fn extract_args(&self, list: &[pd_ext::atom::Atom]) -> Result<(Option<usize>, f64), String> {
+            if list.len() != 2 {
+                return Err("expected 2 arguments".into());
+            }
+            let mut index = None;
+            if let Some(i) = list[0].get_int() {
+                index = Some(i as usize);
+            } else {
+                let s = list[0].get_symbol();
+                if s.is_none() || s.unwrap() != *ALL {
+                    return Err("expect first arg to be an index or 'all'".into());
+                }
+            }
+            let val = list[1].get_float();
+            if val.is_none() {
+                return Err("expect second arg to be a float".into());
+            }
+            let val = val.unwrap() as f64;
+            Ok((index, val))
+        }
+
     }
 
     impl SignalProcessorExternal for AtsSinNoiExternal {
@@ -111,7 +154,8 @@ pd_ext_macros::external! {
                 current: None,
                 data_send,
                 data_recv,
-                synths
+                synths,
+                post: builder.poster()
             }
         }
 
