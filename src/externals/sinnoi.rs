@@ -2,6 +2,7 @@ use crate::data::AtsData;
 use itertools::izip;
 use pd_ext::builder::SignalProcessorExternalBuilder;
 use pd_ext::external::SignalProcessorExternal;
+use rand::prelude::*;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::Arc;
 
@@ -11,26 +12,49 @@ enum Command {
     Data(Option<Arc<AtsData>>),
 }
 
+fn noise() -> f64 {
+    thread_rng().gen_range(-1f64, 1f64)
+}
+
 pub struct ParitalSynth {
-    phase: f64,
-    noise_last: f64,
     phase_freq_mul: f64,
+    phase: f64,
+    noise_phase: f64,
+    noise_x0: f64,
+    noise_x1: f64,
+    noise_bw_scale: f64,
 }
 
 impl Default for ParitalSynth {
     fn default() -> Self {
         Self {
-            phase: 0.into(),
-            noise_last: 0.into(),
             phase_freq_mul: 1f64 / 44100f64,
+            phase: 0.into(),
+            noise_phase: 0.into(),
+            noise_x0: noise(),
+            noise_x1: noise(),
+            noise_bw_scale: 0.1f64,
         }
     }
 }
 
 impl ParitalSynth {
-    pub fn synth(&mut self, freq: f64, _noise_energy: f64) -> f32 {
+    pub fn synth(&mut self, freq: f64, noise_energy: f64) -> f32 {
+        //TODO if freq > 500 { 1 } else { 0.25 } * bw...
+        let noise_bw = freq * self.noise_bw_scale;
+
         self.phase = (self.phase + freq * self.phase_freq_mul).fract();
-        (2f64 * std::f64::consts::PI * self.phase).sin() as f32
+        self.noise_phase = self.noise_phase + noise_bw * self.phase_freq_mul;
+        if self.noise_phase >= 1f64 {
+            self.noise_phase = self.noise_phase.fract();
+            self.noise_x0 = self.noise_x1;
+            self.noise_x1 = noise();
+        }
+
+        let sin = (2f64 * std::f64::consts::PI * self.phase).sin();
+        let noise = lerp(self.noise_x0, self.noise_x1, self.noise_phase);
+
+        (sin + noise * sin * noise_energy) as f32
     }
 
     pub fn sample_rate(&mut self, sr: f64) {
