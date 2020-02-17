@@ -39,7 +39,7 @@ impl Default for ParitalSynth {
 }
 
 impl ParitalSynth {
-    pub fn synth(&mut self, freq: f64, noise_energy: f64) -> f32 {
+    pub fn synth(&mut self, freq: f64, sin_amp: f64, noise_energy: f64) -> f32 {
         //TODO if freq > 500 { 1 } else { 0.25 } * bw...
         let noise_bw = freq * self.noise_bw_scale;
 
@@ -54,7 +54,7 @@ impl ParitalSynth {
         let sin = (2f64 * std::f64::consts::PI * self.phase).sin();
         let noise = lerp(self.noise_x0, self.noise_x1, self.noise_phase);
 
-        (sin + noise * sin * noise_energy) as f32
+        (sin * sin_amp + noise * sin * noise_energy) as f32
     }
 
     pub fn sample_rate(&mut self, sr: f64) {
@@ -156,7 +156,7 @@ pd_ext_macros::external! {
                         } else {
                             (0f64, 0f64)
                         };
-                        *out = *out + s.synth(f, n) * (a as f32);
+                        *out = *out + s.synth(f, a, n);
                     }
                 }
             }
