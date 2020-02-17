@@ -22,6 +22,10 @@ pub struct ParitalSynth {
     noise_phase: f64,
     noise_x0: f64,
     noise_x1: f64,
+    freq_mul: f64,
+    freq_add: f64,
+    amp_mul: f64,
+    noise_amp_mul: f64,
     noise_bw_scale: f64,
 }
 
@@ -33,6 +37,10 @@ impl Default for ParitalSynth {
             noise_phase: 0.into(),
             noise_x0: noise(),
             noise_x1: noise(),
+            freq_mul: 1f64,
+            freq_add: 0f64,
+            amp_mul: 1f64,
+            noise_amp_mul: 1f64,
             noise_bw_scale: 0.1f64,
         }
     }
@@ -40,6 +48,12 @@ impl Default for ParitalSynth {
 
 impl ParitalSynth {
     pub fn synth(&mut self, freq: f64, sin_amp: f64, noise_energy: f64) -> f32 {
+        //apply transformations
+        //should freq scaling affect noise bandwidth and offset?
+        let freq = freq * self.freq_mul + self.freq_add;
+        let sin_amp = self.amp_mul * sin_amp;
+        let noise_energy = noise_energy * self.noise_amp_mul;
+
         //TODO if freq > 500 { 1 } else { 0.25 } * bw...
         let noise_bw = freq * self.noise_bw_scale;
 
