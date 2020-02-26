@@ -1,4 +1,4 @@
-#N canvas 719 62 961 966 10;
+#N canvas 2 74 1916 1004 10;
 #X declare -lib ats;
 #X obj 46 58 openpanel;
 #X msg 46 86 open \$1;
@@ -59,7 +59,7 @@
 #X msg 600 838 all noise_amp \$1;
 #X msg 453 840 all sine_amp \$1;
 #X obj 429 40 declare -lib ats;
-#X obj 113 259 ats/data;
+#X obj 114 267 ats/data;
 #X obj 160 339 print;
 #X obj 117 524 ats/sinnoi~ 50;
 #X obj 131 447 catch~ \$0-time;
@@ -70,6 +70,8 @@
 #X obj 494 311 * 1000;
 #X obj 579 340 r \$0-durs;
 #X msg 422 380 0 \, \$2 \$3;
+#X obj 139 217 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
+-1 -1;
 #X connect 0 0 1 0;
 #X connect 1 0 14 0;
 #X connect 2 0 0 0;
@@ -126,3 +128,4 @@
 #X connect 56 0 17 1;
 #X connect 57 0 7 1;
 #X connect 58 0 4 0;
+#X connect 59 0 48 0;
