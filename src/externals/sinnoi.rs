@@ -182,10 +182,10 @@ pd_ext_macros::external! {
                 //TODO handle offset
                 let range = 0..std::cmp::min(c.partials(), self.synths.len());
                 let synths = &mut self.synths[range.clone()];
+                let frames = c.frames.len() as isize;
                 for (out, pos) in outputs[0].iter_mut().zip(inputs[0].iter()) {
                     let pos = (*pos as f64) * pmul;
                     let mut p0 = pos.floor() as isize;
-                    let frames = c.frames.len() as isize;
                     let mut fract = 0f64;
                     let mut in_range = false;
                     if p0 < 0 {
