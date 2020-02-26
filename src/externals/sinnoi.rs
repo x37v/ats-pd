@@ -201,6 +201,7 @@ pd_ext_macros::external! {
 
                     let f0 = &c.frames[p0];
                     let f1 = &c.frames[p0 + 1];
+                    *out = 0 as pd_sys::t_float;
                     for (s, p0, p1) in izip!(synths.iter_mut(), f0[range.clone()].iter(), f1[range.clone()].iter()) {
                         let f = lerp(p0.freq, p1.freq, fract);
                         let (a, n) = if in_range {
