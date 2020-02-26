@@ -21,11 +21,6 @@ fn noise() -> f64 {
 
 lazy_static::lazy_static! {
     static ref ALL: Symbol = "all".try_into().unwrap();
-    static ref FREQ_MUL: Symbol = "freq_mul".try_into().unwrap();
-    static ref FREQ_ADD: Symbol = "freq_add".try_into().unwrap();
-    static ref AMP_MUL: Symbol = "amp_mul".try_into().unwrap();
-    static ref NOISE_MUL: Symbol = "noise_mul".try_into().unwrap();
-    static ref NOISE_BW: Symbol = "noise_bw".try_into().unwrap();
 }
 
 pub struct ParitalSynth {
@@ -39,6 +34,30 @@ pub struct ParitalSynth {
     amp_mul: f64,
     noise_amp_mul: f64,
     noise_bw_scale: f64,
+}
+
+impl ParitalSynth {
+    //TODO set linear interpolator
+
+    pub fn freq_mul(&mut self, v: f64) {
+        self.freq_mul = v;
+    }
+
+    pub fn freq_add(&mut self, v: f64) {
+        self.freq_add = v;
+    }
+
+    pub fn amp_mul(&mut self, v: f64) {
+        self.amp_mul = v;
+    }
+
+    pub fn noise_amp_mul(&mut self, v: f64) {
+        self.noise_amp_mul = v;
+    }
+
+    pub fn noise_bw_scale(&mut self, v: f64) {
+        self.noise_bw_scale = v;
+    }
 }
 
 impl Default for ParitalSynth {
@@ -113,10 +132,43 @@ pd_ext_macros::external! {
 
         #[sel]
         pub fn freq_mul(&mut self, args: &[pd_ext::atom::Atom]) {
+            self.apply_if(args, |s, v| s.freq_mul(v));
+        }
+
+        #[sel]
+        pub fn freq_add(&mut self, args: &[pd_ext::atom::Atom]) {
+            self.apply_if(args, |s, v| s.freq_add(v));
+        }
+
+        #[sel]
+        pub fn amp_mul(&mut self, args: &[pd_ext::atom::Atom]) {
+            self.apply_if(args, |s, v| s.amp_mul(v));
+        }
+
+        #[sel]
+        pub fn noise_amp_mul(&mut self, args: &[pd_ext::atom::Atom]) {
+            self.apply_if(args, |s, v| s.noise_amp_mul(v));
+        }
+
+        #[sel]
+        pub fn noise_bw_scale(&mut self, args: &[pd_ext::atom::Atom]) {
+            self.apply_if(args, |s, v| s.noise_bw_scale(v));
+        }
+
+        fn apply_if<F: Fn(&mut ParitalSynth, f64)>(&mut self, args: &[pd_ext::atom::Atom], f: F) {
             match self.extract_args(args) {
-                Ok((i, v)) => (),
-                Err(e) => self.post.post_error(e),
-            };
+                Ok((i, v)) =>
+                    if let Some(i) = i {
+                        if i < self.synths.len() {
+                            f(&mut self.synths[i], v)
+                        }
+                    } else {
+                        for s in self.synths.iter_mut() {
+                            f(s, v);
+                        }
+                    },
+                Err(msg) => self.post.post_error(msg)
+            }
         }
 
         fn extract_args(&self, list: &[pd_ext::atom::Atom]) -> Result<(Option<usize>, f64), String> {
@@ -125,7 +177,11 @@ pd_ext_macros::external! {
             }
             let mut index = None;
             if let Some(i) = list[0].get_int() {
-                index = Some(i as usize);
+                let i = i as usize;
+                if i > self.synths.len() {
+                    return Err(format!("partial index {} out of range", i));
+                }
+                index = Some(i);
             } else {
                 let s = list[0].get_symbol();
                 if s.is_none() || s.unwrap() != *ALL {
