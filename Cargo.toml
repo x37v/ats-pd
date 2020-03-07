@@ -20,3 +20,8 @@ tempfile = "3.1.0"
 itertools = "0.8.2"
 rand = "0.7.3"
 atomic = "0.4.5"
+
+[profile.release]
+lto = "fat"
+panic = "abort"
+codegen-units = 1
