@@ -9,6 +9,10 @@ This project uses PD's `structs` to store data that can be visualized as well as
 
 It is a work in progress!
 
+```
+cargo make run --profile=release
+```
+
 
 ## TODO
 
