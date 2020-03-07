@@ -1,7 +1,8 @@
 use crate::data::AtsData;
+use atomic::Atomic;
 use itertools::izip;
 use pd_ext::builder::SignalProcessorExternalBuilder;
-use pd_ext::external::SignalProcessorExternal;
+use pd_ext::external::{SignalProcessor, SignalProcessorExternal};
 use pd_ext::post::PdPost;
 use pd_ext::symbol::Symbol;
 use rand::prelude::*;
@@ -10,6 +11,10 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::Arc;
 
 const DSP_RECV_MAX: usize = 32;
+const STORE_ORDERING: std::sync::atomic::Ordering = std::sync::atomic::Ordering::Relaxed;
+const LOAD_ORDERING: std::sync::atomic::Ordering = std::sync::atomic::Ordering::Relaxed;
+
+type ArcAtomic<T> = Arc<Atomic<T>>;
 
 enum Command {
     Data(Option<Arc<AtsData>>),
@@ -29,64 +34,104 @@ pub struct ParitalSynth {
     noise_phase: f64,
     noise_x0: f64,
     noise_x1: f64,
-    freq_mul: f64,
-    freq_add: f64,
-    amp_mul: f64,
-    noise_amp_mul: f64,
-    noise_bw_scale: f64,
+
+    //params
+    freq_mul: ArcAtomic<f64>,
+    freq_add: ArcAtomic<f64>,
+    amp_mul: ArcAtomic<f64>,
+    noise_amp_mul: ArcAtomic<f64>,
+    noise_bw_scale: ArcAtomic<f64>,
 }
 
-impl ParitalSynth {
-    //TODO set linear interpolator
+struct ParitalSynthHandle {
+    freq_mul: ArcAtomic<f64>,
+    freq_add: ArcAtomic<f64>,
+    amp_mul: ArcAtomic<f64>,
+    noise_amp_mul: ArcAtomic<f64>,
+    noise_bw_scale: ArcAtomic<f64>,
+}
 
+impl ParitalSynthHandle {
     pub fn freq_mul(&mut self, v: f64) {
-        self.freq_mul = v;
+        self.freq_mul.store(v, STORE_ORDERING);
     }
 
     pub fn freq_add(&mut self, v: f64) {
-        self.freq_add = v;
+        self.freq_add.store(v, STORE_ORDERING);
     }
 
     pub fn amp_mul(&mut self, v: f64) {
-        self.amp_mul = v;
+        self.amp_mul.store(v, STORE_ORDERING);
     }
 
     pub fn noise_amp_mul(&mut self, v: f64) {
-        self.noise_amp_mul = v;
+        self.noise_amp_mul.store(v, STORE_ORDERING);
     }
 
     pub fn noise_bw_scale(&mut self, v: f64) {
-        self.noise_bw_scale = v;
+        self.noise_bw_scale.store(v, STORE_ORDERING);
+    }
+
+    pub fn new() -> (Self, ParitalSynth) {
+        let freq_mul = Arc::new(Atomic::new(1f64));
+        let freq_add = Arc::new(Atomic::new(0f64));
+        let amp_mul = Arc::new(Atomic::new(1f64));
+        let noise_amp_mul = Arc::new(Atomic::new(1f64));
+        let noise_bw_scale = Arc::new(Atomic::new(0.1f64));
+        (
+            Self {
+                freq_mul: freq_mul.clone(),
+                freq_add: freq_add.clone(),
+                amp_mul: amp_mul.clone(),
+                noise_amp_mul: noise_amp_mul.clone(),
+                noise_bw_scale: noise_bw_scale.clone(),
+            },
+            ParitalSynth::new(freq_mul, freq_add, amp_mul, noise_amp_mul, noise_bw_scale),
+        )
     }
 }
 
-impl Default for ParitalSynth {
-    fn default() -> Self {
+impl ParitalSynth {
+    fn new(
+        freq_mul: ArcAtomic<f64>,
+        freq_add: ArcAtomic<f64>,
+        amp_mul: ArcAtomic<f64>,
+        noise_amp_mul: ArcAtomic<f64>,
+        noise_bw_scale: ArcAtomic<f64>,
+    ) -> Self {
         Self {
             phase_freq_mul: 1f64 / 44100f64,
             phase: 0.into(),
             noise_phase: 0.into(),
             noise_x0: noise(),
             noise_x1: noise(),
-            freq_mul: 1f64,
-            freq_add: 0f64,
-            amp_mul: 1f64,
-            noise_amp_mul: 1f64,
-            noise_bw_scale: 0.1f64,
+
+            freq_mul,
+            freq_add,
+            amp_mul,
+            noise_amp_mul,
+            noise_bw_scale,
         }
     }
 }
 
 impl ParitalSynth {
     pub fn synth(&mut self, freq: f64, sin_amp: f64, noise_energy: f64) -> f32 {
+        //TODO interpolate
+        let freq_mul = self.freq_mul.load(LOAD_ORDERING);
+        let freq_add = self.freq_add.load(LOAD_ORDERING);
+        let amp_mul = self.amp_mul.load(LOAD_ORDERING);
+        let noise_amp_mul = self.noise_amp_mul.load(LOAD_ORDERING);
+        let noise_bw_scale = self.noise_bw_scale.load(LOAD_ORDERING);
+
         //apply transformations
         //should freq scaling affect noise bandwidth and offset?
-        let freq = freq * self.freq_mul + self.freq_add;
-        let sin_amp = self.amp_mul * sin_amp;
-        let noise_energy = noise_energy * self.noise_amp_mul;
+        let freq = freq * freq_mul + freq_add;
+        let sin_amp = amp_mul * sin_amp;
+        let noise_energy = noise_energy * noise_amp_mul;
 
         //TODO if freq > 500 { 1 } else { 0.25 } * bw...
-        let noise_bw = freq * self.noise_bw_scale;
+        let noise_bw = freq * noise_bw_scale;
 
         self.phase = (self.phase + freq * self.phase_freq_mul).fract();
         self.noise_phase = self.noise_phase + noise_bw * self.phase_freq_mul;
@@ -102,18 +147,93 @@ impl ParitalSynth {
         (sin * sin_amp + noise * sin * noise_energy) as f32
     }
 
+    /*
     pub fn sample_rate(&mut self, sr: f64) {
         self.phase_freq_mul = 1f64 / sr;
+    }
+    */
+}
+
+pub struct AtsSinNoiProcessor {
+    current: Option<Arc<AtsData>>,
+    data_recv: Receiver<Command>,
+    synths: Box<[ParitalSynth]>,
+}
+
+impl SignalProcessor for AtsSinNoiProcessor {
+    fn process(
+        &mut self,
+        _frames: usize,
+        inputs: &[&mut [pd_sys::t_float]],
+        outputs: &mut [&mut [pd_sys::t_float]],
+    ) {
+        let mut cnt = 0;
+        while let Ok(c) = self.data_recv.try_recv() {
+            match c {
+                Command::Data(c) => self.current = c,
+            }
+            cnt = cnt + 1;
+            if cnt > DSP_RECV_MAX {
+                break;
+            }
+        }
+
+        if let Some(c) = &self.current {
+            let with_noise = c.has_noise();
+            let pmul = c.header.fra / c.header.dur;
+            //TODO handle offset
+            let range = 0..std::cmp::min(c.partials(), self.synths.len());
+            let synths = &mut self.synths[range.clone()];
+            let frames = c.frames.len() as isize;
+            for (out, pos) in outputs[0].iter_mut().zip(inputs[0].iter()) {
+                let pos = (*pos as f64) * pmul;
+                let mut p0 = pos.floor() as isize;
+                let mut fract = 0f64;
+                let mut in_range = false;
+                if p0 < 0 {
+                    p0 = 0;
+                } else if p0 + 1 >= frames {
+                    p0 = frames - 2;
+                    fract = 1f64;
+                } else {
+                    fract = pos.fract();
+                    in_range = true;
+                }
+                let p0 = p0 as usize;
+
+                let f0 = &c.frames[p0];
+                let f1 = &c.frames[p0 + 1];
+                *out = 0 as pd_sys::t_float;
+                for (s, p0, p1) in izip!(
+                    synths.iter_mut(),
+                    f0[range.clone()].iter(),
+                    f1[range.clone()].iter()
+                ) {
+                    let f = lerp(p0.freq, p1.freq, fract);
+                    let (a, n) = if in_range {
+                        (
+                            lerp(p0.amp, p1.amp, fract),
+                            if with_noise {
+                                lerp(p0.noise_energy.unwrap(), p1.noise_energy.unwrap(), fract)
+                            } else {
+                                0f64
+                            },
+                        )
+                    } else {
+                        (0f64, 0f64)
+                    };
+                    *out = *out + s.synth(f, a, n);
+                }
+            }
+        }
     }
 }
 
 pd_ext_macros::external! {
     #[name = "ats/sinnoi~"]
     pub struct AtsSinNoiExternal {
-        current: Option<Arc<AtsData>>,
         data_send: SyncSender<Command>,
-        data_recv: Receiver<Command>,
-        synths: Box<[ParitalSynth]>,
+        handles: Box<[ParitalSynthHandle]>,
         post: Box<dyn PdPost>,
     }
 
@@ -155,15 +275,15 @@ pd_ext_macros::external! {
             self.apply_if(args, |s, v| s.noise_bw_scale(v));
         }
 
-        fn apply_if<F: Fn(&mut ParitalSynth, f64)>(&mut self, args: &[pd_ext::atom::Atom], f: F) {
+        fn apply_if<F: Fn(&mut ParitalSynthHandle, f64)>(&mut self, args: &[pd_ext::atom::Atom], f: F) {
             match self.extract_args(args) {
                 Ok((i, v)) =>
                     if let Some(i) = i {
-                        if i < self.synths.len() {
-                            f(&mut self.synths[i], v)
+                        if i < self.handles.len() {
+                            f(&mut self.handles[i], v)
                         }
                     } else {
-                        for s in self.synths.iter_mut() {
+                        for s in self.handles.iter_mut() {
                             f(s, v);
                         }
                     },
@@ -178,7 +298,7 @@ pd_ext_macros::external! {
             let mut index = None;
             if let Some(i) = list[0].get_int() {
                 let i = i as usize;
-                if i > self.synths.len() {
+                if i > self.handles.len() {
                     return Err(format!("partial index {} out of range", i));
                 }
                 index = Some(i);
@@ -199,82 +319,29 @@ pd_ext_macros::external! {
     }
 
     impl SignalProcessorExternal for AtsSinNoiExternal {
-        fn new(builder: &mut dyn SignalProcessorExternalBuilder<Self>) -> Self {
+        fn new(builder: &mut dyn SignalProcessorExternalBuilder<Self>) -> (Self, Box<dyn SignalProcessor>) {
             builder.new_signal_outlet();
             let (data_send, data_recv) = sync_channel(32);
 
-            let synths = 50; //TODO get from args
-            let synths = (0..synths).map(|_| ParitalSynth::default()).collect();
+            let mut synths = Vec::new();
+            let mut handles = Vec::new();
+            for _ in 0..50 { //TODO get count from args
+                let (h, s) = ParitalSynthHandle::new();
+                handles.push(h);
+                synths.push(s);
+            }
 
+            (
             Self {
-                current: None,
                 data_send,
-                data_recv,
-                synths,
+                handles: handles.into(),
                 post: builder.poster()
-            }
-        }
-
-        fn process(
-            &mut self,
-            _frames: usize,
-            inputs: &[&mut [pd_sys::t_float]],
-            outputs: &mut [&mut [pd_sys::t_float]],
-        ) {
-            let mut cnt = 0;
-            while let Ok(c) = self.data_recv.try_recv() {
-                match c {
-                    Command::Data(c) => self.current = c
-                }
-                cnt = cnt + 1;
-                if cnt > DSP_RECV_MAX {
-                    break;
-                }
-            }
-
-            if let Some(c) = &self.current {
-                let with_noise = c.has_noise();
-                let pmul = c.header.fra / c.header.dur;
-                //TODO handle offset
-                let range = 0..std::cmp::min(c.partials(), self.synths.len());
-                let synths = &mut self.synths[range.clone()];
-                let frames = c.frames.len() as isize;
-                for (out, pos) in outputs[0].iter_mut().zip(inputs[0].iter()) {
-                    let pos = (*pos as f64) * pmul;
-                    let mut p0 = pos.floor() as isize;
-                    let mut fract = 0f64;
-                    let mut in_range = false;
-                    if p0 < 0 {
-                        p0 = 0;
-                    } else if p0 + 1 >= frames {
-                        p0 = frames - 2;
-                        fract = 1f64;
-                    } else {
-                        fract = pos.fract();
-                        in_range = true;
-                    }
-                    let p0 = p0 as usize;
-
-                    let f0 = &c.frames[p0];
-                    let f1 = &c.frames[p0 + 1];
-                    *out = 0 as pd_sys::t_float;
-                    for (s, p0, p1) in izip!(synths.iter_mut(), f0[range.clone()].iter(), f1[range.clone()].iter()) {
-                        let f = lerp(p0.freq, p1.freq, fract);
-                        let (a, n) = if in_range {
-                            (
-                            lerp(p0.amp, p1.amp, fract),
-                            if with_noise {
-                                lerp(p0.noise_energy.unwrap(), p1.noise_energy.unwrap(), fract)
-                            } else {
-                                0f64
-                            })
-                        } else {
-                            (0f64, 0f64)
-                        };
-                        *out = *out + s.synth(f, a, n);
-                    }
-                }
-            }
+            },
+            Box::new(AtsSinNoiProcessor {
+                current: None,
+                data_recv,
+                synths: synths.into(),
+            }))
         }
     }
 }
