@@ -32,13 +32,13 @@ external! {
     }
 
     impl ControlExternal for AtsDataExternal {
-        fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Self {
+        fn new(builder: &mut dyn ControlExternalBuilder<Self>) -> Result<Self, String> {
             let data_outlet = builder.new_message_outlet(OutletType::AnyThing);
             let info_outlet = builder.new_message_outlet(OutletType::AnyThing);
             let clock = Clock::new(builder.obj(), atsdataexternal_poll_done_trampoline);
             let (file_send, file_recv) = channel();
             let post = builder.poster();
-            Self {
+            Ok(Self {
                 data_outlet,
                 info_outlet,
                 current: None,
@@ -47,7 +47,7 @@ external! {
                 waiting: Default::default(),
                 file_send,
                 file_recv
-            }
+            })
         }
     }
 

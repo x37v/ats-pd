@@ -319,7 +319,7 @@ pd_ext_macros::external! {
     }
 
     impl SignalProcessorExternal for AtsSinNoiExternal {
-        fn new(builder: &mut dyn SignalProcessorExternalBuilder<Self>) -> (Self, Box<dyn SignalProcessor>) {
+        fn new(builder: &mut dyn SignalProcessorExternalBuilder<Self>) -> Result<(Self, Box<dyn SignalProcessor>), String> {
             builder.new_signal_outlet();
             let (data_send, data_recv) = sync_channel(32);
 
@@ -331,7 +331,7 @@ pd_ext_macros::external! {
                 synths.push(s);
             }
 
-            (
+            Ok((
             Self {
                 data_send,
                 handles: handles.into(),
@@ -341,7 +341,7 @@ pd_ext_macros::external! {
                 current: None,
                 data_recv,
                 synths: synths.into(),
-            }))
+            })))
         }
     }
 }
