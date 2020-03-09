@@ -262,6 +262,11 @@ impl SignalProcessor for AtsSinNoiProcessor {
     }
 }
 
+fn set_clamp_bottom(a: &mut ArcAtomic<usize>, v: pd_sys::t_float, b: isize) {
+    let v = std::cmp::max(b, v.floor() as isize) as usize;
+    a.store(v, STORE_ORDERING);
+}
+
 pd_ext_macros::external! {
     #[name = "ats/sinnoi~"]
     pub struct AtsSinNoiExternal {
@@ -274,6 +279,7 @@ pd_ext_macros::external! {
     }
 
     impl AtsSinNoiExternal {
+
         #[sel]
         pub fn ats_data(&mut self, key: pd_ext::symbol::Symbol) {
             let d = crate::cache::get(key);
@@ -288,20 +294,17 @@ pd_ext_macros::external! {
 
         #[sel]
         pub fn offset(&mut self, v: pd_sys::t_float) {
-            let v = std::cmp::max(0, v.floor() as isize) as usize;
-            self.offset.store(v, STORE_ORDERING);
+            set_clamp_bottom(&mut self.offset, v, 0);
         }
 
         #[sel]
         pub fn incr(&mut self, v: pd_sys::t_float) {
-            let v = std::cmp::max(1, v.floor() as isize) as usize;
-            self.incr.store(v, STORE_ORDERING);
+            set_clamp_bottom(&mut self.incr, v, 1);
         }
 
         #[sel]
         pub fn limit(&mut self, v: pd_sys::t_float) {
-            let v = std::cmp::max(0, v.floor() as isize) as usize;
-            self.limit.store(v, STORE_ORDERING);
+            set_clamp_bottom(&mut self.limit, v, 0);
         }
 
         #[sel]
