@@ -159,6 +159,7 @@ pub struct AtsSinNoiProcessor {
     data_recv: Receiver<Command>,
     incr: ArcAtomic<usize>,
     offset: ArcAtomic<usize>,
+    limit: ArcAtomic<usize>,
     synths: Box<[ParitalSynth]>,
 }
 
@@ -192,6 +193,7 @@ impl SignalProcessor for AtsSinNoiProcessor {
 
             let start = self.offset.load(LOAD_ORDERING);
             let incr = self.incr.load(LOAD_ORDERING);
+            let limit = self.limit.load(LOAD_ORDERING);
             let count = c.partials();
             if start >= count {
                 clear();
@@ -201,7 +203,7 @@ impl SignalProcessor for AtsSinNoiProcessor {
             let count = count / incr + if (count % incr) > 0 { 1 } else { 0 };
 
             //total partials to synthesize
-            let count = std::cmp::min(count, self.synths.len());
+            let count = std::cmp::min(count, std::cmp::min(limit, self.synths.len()));
 
             if count == 0 {
                 clear();
@@ -264,8 +266,9 @@ pd_ext_macros::external! {
     #[name = "ats/sinnoi~"]
     pub struct AtsSinNoiExternal {
         data_send: SyncSender<Command>,
-        incr: ArcAtomic<usize>,
         offset: ArcAtomic<usize>,
+        incr: ArcAtomic<usize>,
+        limit: ArcAtomic<usize>,
         handles: Box<[ParitalSynthHandle]>,
         post: Box<dyn PdPost>,
     }
@@ -293,6 +296,12 @@ pd_ext_macros::external! {
         pub fn incr(&mut self, v: pd_sys::t_float) {
             let v = std::cmp::max(1, v.floor() as isize) as usize;
             self.incr.store(v, STORE_ORDERING);
+        }
+
+        #[sel]
+        pub fn limit(&mut self, v: pd_sys::t_float) {
+            let v = std::cmp::max(0, v.floor() as isize) as usize;
+            self.limit.store(v, STORE_ORDERING);
         }
 
         #[sel]
@@ -398,6 +407,7 @@ pd_ext_macros::external! {
 
             let offset = Arc::new(Atomic::new(offset as usize));
             let incr = Arc::new(Atomic::new(incr as usize));
+            let limit = Arc::new(Atomic::new(std::usize::MAX));
 
             if let Some(partials) = partials {
                 let mut synths = Vec::new();
@@ -415,6 +425,7 @@ pd_ext_macros::external! {
                             handles: handles.into(),
                             offset: offset.clone(),
                             incr: incr.clone(),
+                            limit: limit.clone(),
                             post: builder.poster()
                         },
                         Box::new(AtsSinNoiProcessor {
@@ -422,6 +433,7 @@ pd_ext_macros::external! {
                             data_recv,
                             offset,
                             incr,
+                            limit,
                             synths: synths.into(),
                         })
                     )
