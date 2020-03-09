@@ -150,6 +150,15 @@ impl AtsData {
                 frames.push(frame_peaks.into_boxed_slice());
             }
 
+            /*
+            for f in frames.iter() {
+                println!("frame");
+                for p in f.iter() {
+                    println!("\t{}", p.freq);
+                }
+            }
+            */
+
             let noise = if noise.len() != 0 {
                 Some(noise.into_boxed_slice())
             } else {
