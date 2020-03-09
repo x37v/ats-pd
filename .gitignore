@@ -3,5 +3,4 @@
 .gdb_history
 **/*.rs.bk
 *.pd_*
-Cargo.lock
 ats-wisdom
