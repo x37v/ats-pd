@@ -14,8 +14,7 @@ pub unsafe extern "C" fn ats_setup() {
     atsdataexternal_setup();
     atssinnoiexternal_tilde_setup();
 
-    let help =
-        pd_ext::symbol::Symbol::try_from("ats-data-help").expect("failed to create help sym");
+    let help = pd_ext::symbol::Symbol::try_from("ats-data").expect("failed to create help sym");
     pd_sys::class_sethelpsymbol(
         crate::externals::data::ATSDATAEXTERNAL_CLASS.unwrap(),
         help.inner(),
