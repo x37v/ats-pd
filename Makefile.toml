@@ -8,13 +8,13 @@ script = ['rsync pd/* ${CARGO_MAKE_CRATE_FS_NAME}/']
 clear = true
 dependencies = ["copy"]
 command = "pd"
-args = ["${CARGO_MAKE_CRATE_FS_NAME}/atsdata-help.pd"]
+args = ["${CARGO_MAKE_CRATE_FS_NAME}/ats-data-help.pd"]
 
 [tasks.run.mac]
 clear = true
 dependencies = ["copy"]
 command = "open"
-args = ["${CARGO_MAKE_CRATE_FS_NAME}/atsdata-help.pd"]
+args = ["${CARGO_MAKE_CRATE_FS_NAME}/ats-data-help.pd"]
 
 [tasks.package]
 dependencies = ["move", "copy"]
