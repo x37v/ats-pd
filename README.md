@@ -2,11 +2,9 @@
 
 Analysis, Transformation and Synthesis (ATS) in Pure Data.
 
-This project is a new approach for using ATS in [Pure Data (aka PD)](https://puredata.info/).
-
 Some years ago I wrote an object for PD called `atsread` that simply read out data from an ATS file.
 
-It is a work in progress!
+This project is a new approach for using ATS in [Pure Data (aka PD)](https://puredata.info/).
 
 ## To build
 
