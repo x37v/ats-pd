@@ -1,4 +1,4 @@
-# atsdata
+# ats/data
 
 Analysis, Transformation and Synthesis (ATS) in Pure Data.
 
