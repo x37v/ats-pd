@@ -8,6 +8,26 @@ Some years ago I wrote an object for PD called `atsread` that simply read out da
 
 It is a work in progress!
 
+## To build
+
+This project is programmed in [rust](https://www.rust-lang.org/).  I recommend that you use [rustup](https://rustup.rs/) to install rust.
+
+Once you have rust installed, you'll need [cargo-make](https://sagiegurari.github.io/cargo-make/).
+
+```
+cargo install --force cargo-make'
+```
+
+Finally, build the project with:
+
+```
+cargo make
+```
+
+### To run
+
+Currently only on Mac or Linux, assuming pure data is already installed.
+
 ```
 cargo make run --profile=release
 ```
@@ -15,6 +35,7 @@ cargo make run --profile=release
 
 ## TODO
 
+* interpolation of re-synthesis parameters
 * Visualization
 	* ticks for the time and frequency axis
 * more transformation examples
