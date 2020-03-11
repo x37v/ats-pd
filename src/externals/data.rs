@@ -217,6 +217,12 @@ fn create_app(cmd_name: &str) -> App {
             .required(true)
             .help("the thing you want to analyize")
         )
+        .arg(Arg::with_name("start")
+            .short("b")
+            .long("start")
+            .takes_value(true)
+            .help("float seconds, defaults to 0")
+        )
         //"\t -e duration (%f seconds or end)\n"
         .arg(Arg::with_name("duration")
             .short("e")
@@ -342,6 +348,9 @@ fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), S
         Ok(m) => {
             let mut oargs: ANARGS = Default::default();
             let source = m.value_of("source").unwrap().into();
+            if let Some(v) = m.value_of("start") {
+                oargs.start = v.parse::<f32>().map_err(stringify)?;
+            }
             if let Some(v) = m.value_of("duration") {
                 oargs.duration = v.parse::<f32>().map_err(stringify)?;
             }
@@ -362,6 +371,9 @@ fn extract_args(cmd_name: &str, args: Vec<String>) -> Result<(String, ANARGS), S
             }
             if let Some(v) = m.value_of("hop_size") {
                 oargs.hop_size = v.parse::<f32>().map_err(stringify)?;
+            }
+            if let Some(v) = m.value_of("lowest_magnitude") {
+                oargs.lowest_mag = v.parse::<f32>().map_err(stringify)?;
             }
             if let Some(v) = m.value_of("track_length") {
                 oargs.track_len = v.parse::<c_int>().map_err(stringify)?;
