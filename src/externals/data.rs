@@ -206,6 +206,7 @@ lazy_static::lazy_static! {
 fn create_app(cmd_name: &str) -> App {
     App::new(cmd_name)
         .setting(AppSettings::ArgRequiredElseHelp)
+        .setting(AppSettings::AllowNegativeNumbers)
         .setting(AppSettings::NoBinaryName)
         .setting(AppSettings::ColorNever)
         .setting(AppSettings::DisableHelpSubcommand)
