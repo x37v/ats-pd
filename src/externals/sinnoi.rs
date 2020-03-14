@@ -16,10 +16,6 @@ const LOAD_ORDERING: std::sync::atomic::Ordering = std::sync::atomic::Ordering::
 
 type ArcAtomic<T> = Arc<Atomic<T>>;
 
-enum Command {
-    Data(Option<Arc<AtsData>>),
-}
-
 fn noise() -> f64 {
     thread_rng().gen_range(-1f64, 1f64)
 }
@@ -156,7 +152,7 @@ impl ParitalSynth {
 
 pub struct AtsSinNoiProcessor {
     current: Option<Arc<AtsData>>,
-    data_recv: Receiver<Command>,
+    data_recv: Receiver<Option<Arc<AtsData>>>,
     incr: ArcAtomic<usize>,
     offset: ArcAtomic<usize>,
     limit: ArcAtomic<usize>,
@@ -172,9 +168,7 @@ impl SignalProcessor for AtsSinNoiProcessor {
     ) {
         let mut cnt = 0;
         while let Ok(c) = self.data_recv.try_recv() {
-            match c {
-                Command::Data(c) => self.current = c,
-            }
+            self.current = c;
             cnt = cnt + 1;
             if cnt > DSP_RECV_MAX {
                 break;
@@ -270,7 +264,7 @@ fn set_clamp_bottom(a: &mut ArcAtomic<usize>, v: pd_sys::t_float, b: isize) {
 pd_ext_macros::external! {
     #[name = "ats/sinnoi~"]
     pub struct AtsSinNoiExternal {
-        data_send: SyncSender<Command>,
+        data_send: SyncSender<Option<Arc<AtsData>>>,
         offset: ArcAtomic<usize>,
         incr: ArcAtomic<usize>,
         limit: ArcAtomic<usize>,
@@ -283,13 +277,13 @@ pd_ext_macros::external! {
         #[sel]
         pub fn ats_data(&mut self, key: pd_ext::symbol::Symbol) {
             let d = crate::cache::get(key);
-            let _ = self.data_send.try_send(Command::Data(d));
+            let _ = self.data_send.try_send(d);
             //TODO warn if empty?
         }
 
         #[sel]
         pub fn clear(&mut self) {
-            let _ = self.data_send.send(Command::Data(None));
+            let _ = self.data_send.send(None);
         }
 
         #[sel]
