@@ -33,7 +33,6 @@ cargo make run --profile=release
 
 ## TODO
 
-* interpolation of re-synthesis parameters
 * Visualization
 	* ticks for the time and frequency axis
 * more transformation examples
