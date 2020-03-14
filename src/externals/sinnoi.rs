@@ -31,12 +31,24 @@ pub struct ParitalSynth {
     noise_x0: f64,
     noise_x1: f64,
 
+    cur_freq_mul: f64,
+    cur_freq_add: f64,
+    cur_amp_mul: f64,
+    cur_noise_amp_mul: f64,
+    cur_noise_bw_scale: f64,
+
     //params
     freq_mul: ArcAtomic<f64>,
     freq_add: ArcAtomic<f64>,
     amp_mul: ArcAtomic<f64>,
     noise_amp_mul: ArcAtomic<f64>,
     noise_bw_scale: ArcAtomic<f64>,
+
+    inc_freq_mul: ArcAtomic<f64>,
+    inc_freq_add: ArcAtomic<f64>,
+    inc_amp_mul: ArcAtomic<f64>,
+    inc_noise_amp_mul: ArcAtomic<f64>,
+    inc_noise_bw_scale: ArcAtomic<f64>,
 }
 
 struct ParitalSynthHandle {
@@ -102,32 +114,67 @@ impl ParitalSynth {
             noise_x0: noise(),
             noise_x1: noise(),
 
+            cur_freq_mul: freq_mul.load(LOAD_ORDERING),
+            cur_freq_add: freq_add.load(LOAD_ORDERING),
+            cur_amp_mul: amp_mul.load(LOAD_ORDERING),
+            cur_noise_amp_mul: noise_amp_mul.load(LOAD_ORDERING),
+            cur_noise_bw_scale: noise_bw_scale.load(LOAD_ORDERING),
+
             freq_mul,
             freq_add,
             amp_mul,
             noise_amp_mul,
             noise_bw_scale,
+
+            inc_freq_mul: Arc::new(Atomic::new(0.001f64)),
+            inc_freq_add: Arc::new(Atomic::new(1f64)),
+            inc_amp_mul: Arc::new(Atomic::new(0.001f64)),
+            inc_noise_amp_mul: Arc::new(Atomic::new(0.001f64)),
+            inc_noise_bw_scale: Arc::new(Atomic::new(0.001f64)),
         }
     }
-}
 
-impl ParitalSynth {
+    pub fn interpolate_params(&mut self) {
+        //interpolate
+        self.cur_freq_mul = inc(
+            self.cur_freq_mul,
+            self.freq_mul.load(LOAD_ORDERING),
+            self.inc_freq_mul.load(LOAD_ORDERING),
+        );
+
+        self.cur_freq_add = inc(
+            self.cur_freq_add,
+            self.freq_add.load(LOAD_ORDERING),
+            self.inc_freq_add.load(LOAD_ORDERING),
+        );
+        self.cur_amp_mul = inc(
+            self.cur_amp_mul,
+            self.amp_mul.load(LOAD_ORDERING),
+            self.inc_amp_mul.load(LOAD_ORDERING),
+        );
+        self.cur_noise_amp_mul = inc(
+            self.cur_noise_amp_mul,
+            self.noise_amp_mul.load(LOAD_ORDERING),
+            self.inc_noise_amp_mul.load(LOAD_ORDERING),
+        );
+        self.cur_noise_bw_scale = inc(
+            self.cur_noise_bw_scale,
+            self.noise_bw_scale.load(LOAD_ORDERING),
+            self.inc_noise_bw_scale.load(LOAD_ORDERING),
+        );
+    }
+
     pub fn synth(&mut self, freq: f64, sin_amp: f64, noise_energy: f64) -> f32 {
-        //TODO interpolate
-        let freq_mul = self.freq_mul.load(LOAD_ORDERING);
-        let freq_add = self.freq_add.load(LOAD_ORDERING);
-        let amp_mul = self.amp_mul.load(LOAD_ORDERING);
-        let noise_amp_mul = self.noise_amp_mul.load(LOAD_ORDERING);
-        let noise_bw_scale = self.noise_bw_scale.load(LOAD_ORDERING);
+        self.interpolate_params();
 
         //apply transformations
         //should freq scaling affect noise bandwidth and offset?
-        let freq = freq * freq_mul + freq_add;
-        let sin_amp = amp_mul * sin_amp;
-        let noise_energy = noise_energy * noise_amp_mul;
+        let freq = freq * self.cur_freq_mul + self.cur_freq_add;
+        let sin_amp = self.cur_amp_mul * sin_amp;
+        let noise_energy = noise_energy * self.cur_noise_amp_mul;
 
         //TODO if freq > 500 { 1 } else { 0.25 } * bw...
-        let noise_bw = freq * noise_bw_scale;
+        let noise_bw = freq * self.cur_noise_bw_scale;
 
         self.phase = (self.phase + freq * self.phase_freq_mul).fract();
         self.noise_phase = self.noise_phase + noise_bw * self.phase_freq_mul;
@@ -438,4 +485,15 @@ pd_ext_macros::external! {
 
 fn lerp(x0: f64, x1: f64, frac: f64) -> f64 {
     x0 + (x1 - x0) * frac
+}
+
+fn inc(cur: f64, dest: f64, inc: f64) -> f64 {
+    //if within inc of dest, return dest
+    if cur == dest || (cur - dest).abs() <= inc {
+        dest
+    } else if cur < dest {
+        cur + inc
+    } else {
+        cur - inc
+    }
 }
