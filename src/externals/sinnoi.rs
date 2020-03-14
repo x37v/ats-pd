@@ -24,6 +24,36 @@ lazy_static::lazy_static! {
     static ref ALL: Symbol = "all".try_into().unwrap();
 }
 
+struct Slewed {
+    cur: f64,
+    dest: ArcAtomic<f64>,
+    inc: ArcAtomic<f64>,
+}
+
+impl Slewed {
+    pub fn new(dest: ArcAtomic<f64>, inc: f64) -> Self {
+        Self {
+            cur: dest.load(LOAD_ORDERING),
+            dest,
+            inc: Arc::new(Atomic::new(inc)),
+        }
+    }
+    pub fn val(&self) -> f64 {
+        self.cur
+    }
+    pub fn update(&mut self) {
+        let dest = self.dest.load(LOAD_ORDERING);
+        let inc = self.inc.load(LOAD_ORDERING);
+        self.cur = if self.cur == dest || (self.cur - dest).abs() <= inc {
+            dest
+        } else if self.cur < dest {
+            self.cur + inc
+        } else {
+            self.cur - inc
+        };
+    }
+}
+
 pub struct ParitalSynth {
     phase_freq_mul: f64,
     phase: f64,
@@ -31,24 +61,12 @@ pub struct ParitalSynth {
     noise_x0: f64,
     noise_x1: f64,
 
-    cur_freq_mul: f64,
-    cur_freq_add: f64,
-    cur_amp_mul: f64,
-    cur_noise_amp_mul: f64,
-    cur_noise_bw_scale: f64,
-
     //params
-    freq_mul: ArcAtomic<f64>,
-    freq_add: ArcAtomic<f64>,
-    amp_mul: ArcAtomic<f64>,
-    noise_amp_mul: ArcAtomic<f64>,
-    noise_bw_scale: ArcAtomic<f64>,
-
-    inc_freq_mul: ArcAtomic<f64>,
-    inc_freq_add: ArcAtomic<f64>,
-    inc_amp_mul: ArcAtomic<f64>,
-    inc_noise_amp_mul: ArcAtomic<f64>,
-    inc_noise_bw_scale: ArcAtomic<f64>,
+    freq_mul: Slewed,
+    freq_add: Slewed,
+    amp_mul: Slewed,
+    noise_amp_mul: Slewed,
+    noise_bw_scale: Slewed,
 }
 
 struct ParitalSynthHandle {
@@ -114,67 +132,33 @@ impl ParitalSynth {
             noise_x0: noise(),
             noise_x1: noise(),
 
-            cur_freq_mul: freq_mul.load(LOAD_ORDERING),
-            cur_freq_add: freq_add.load(LOAD_ORDERING),
-            cur_amp_mul: amp_mul.load(LOAD_ORDERING),
-            cur_noise_amp_mul: noise_amp_mul.load(LOAD_ORDERING),
-            cur_noise_bw_scale: noise_bw_scale.load(LOAD_ORDERING),
-
-            freq_mul,
-            freq_add,
-            amp_mul,
-            noise_amp_mul,
-            noise_bw_scale,
-
-            inc_freq_mul: Arc::new(Atomic::new(0.001f64)),
-            inc_freq_add: Arc::new(Atomic::new(1f64)),
-            inc_amp_mul: Arc::new(Atomic::new(0.001f64)),
-            inc_noise_amp_mul: Arc::new(Atomic::new(0.001f64)),
-            inc_noise_bw_scale: Arc::new(Atomic::new(0.001f64)),
+            freq_mul: Slewed::new(freq_mul, 0.001f64),
+            freq_add: Slewed::new(freq_add, 1f64),
+            amp_mul: Slewed::new(amp_mul, 0.001f64),
+            noise_amp_mul: Slewed::new(noise_amp_mul, 0.001f64),
+            noise_bw_scale: Slewed::new(noise_bw_scale, 0.001f64),
         }
     }
 
-    pub fn interpolate_params(&mut self) {
-        //interpolate
-        self.cur_freq_mul = inc(
-            self.cur_freq_mul,
-            self.freq_mul.load(LOAD_ORDERING),
-            self.inc_freq_mul.load(LOAD_ORDERING),
-        );
-
-        self.cur_freq_add = inc(
-            self.cur_freq_add,
-            self.freq_add.load(LOAD_ORDERING),
-            self.inc_freq_add.load(LOAD_ORDERING),
-        );
-        self.cur_amp_mul = inc(
-            self.cur_amp_mul,
-            self.amp_mul.load(LOAD_ORDERING),
-            self.inc_amp_mul.load(LOAD_ORDERING),
-        );
-        self.cur_noise_amp_mul = inc(
-            self.cur_noise_amp_mul,
-            self.noise_amp_mul.load(LOAD_ORDERING),
-            self.inc_noise_amp_mul.load(LOAD_ORDERING),
-        );
-        self.cur_noise_bw_scale = inc(
-            self.cur_noise_bw_scale,
-            self.noise_bw_scale.load(LOAD_ORDERING),
-            self.inc_noise_bw_scale.load(LOAD_ORDERING),
-        );
+    pub fn slew(&mut self) {
+        self.freq_mul.update();
+        self.freq_add.update();
+        self.amp_mul.update();
+        self.noise_amp_mul.update();
+        self.noise_bw_scale.update();
     }
 
     pub fn synth(&mut self, freq: f64, sin_amp: f64, noise_energy: f64) -> f32 {
-        self.interpolate_params();
+        self.slew();
 
         //apply transformations
         //should freq scaling affect noise bandwidth and offset?
-        let freq = freq * self.cur_freq_mul + self.cur_freq_add;
-        let sin_amp = self.cur_amp_mul * sin_amp;
-        let noise_energy = noise_energy * self.cur_noise_amp_mul;
+        let freq = freq * self.freq_mul.val() + self.freq_add.val();
+        let sin_amp = self.amp_mul.val() * sin_amp;
+        let noise_energy = noise_energy * self.noise_amp_mul.val();
 
         //TODO if freq > 500 { 1 } else { 0.25 } * bw...
-        let noise_bw = freq * self.cur_noise_bw_scale;
+        let noise_bw = freq * self.noise_bw_scale.val();
 
         self.phase = (self.phase + freq * self.phase_freq_mul).fract();
         self.noise_phase = self.noise_phase + noise_bw * self.phase_freq_mul;
@@ -485,15 +469,4 @@ pd_ext_macros::external! {
 
 fn lerp(x0: f64, x1: f64, frac: f64) -> f64 {
     x0 + (x1 - x0) * frac
-}
-
-fn inc(cur: f64, dest: f64, inc: f64) -> f64 {
-    //if within inc of dest, return dest
-    if cur == dest || (cur - dest).abs() <= inc {
-        dest
-    } else if cur < dest {
-        cur + inc
-    } else {
-        cur - inc
-    }
 }
