@@ -96,7 +96,7 @@ impl ParitalSynth {
         noise_bw_scale: ArcAtomic<f64>,
     ) -> Self {
         Self {
-            phase_freq_mul: 1f64 / 44100f64,
+            phase_freq_mul: 1f64 / pd_ext::pd::sample_rate() as f64,
             phase: 0.into(),
             noise_phase: 0.into(),
             noise_x0: noise(),
@@ -142,12 +142,6 @@ impl ParitalSynth {
 
         (sin * sin_amp + noise * sin * noise_energy) as f32
     }
-
-    /*
-    pub fn sample_rate(&mut self, sr: f64) {
-        self.phase_freq_mul = 1f64 / sr;
-    }
-    */
 }
 
 pub struct AtsSinNoiProcessor {
