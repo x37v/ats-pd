@@ -33,6 +33,13 @@ cargo make run --profile=release
 
 ## TODO
 
+* `sinnoi~` options for audio rate transformation, would apply to all
+	partials, though the message rate values could be used as well.
+	* freq mul
+	* freq add
+	* sines amp
+	* noise amp
+	* noise bandwidth
 * Visualization
 	* ticks for the time and frequency axis
 * more transformation examples
